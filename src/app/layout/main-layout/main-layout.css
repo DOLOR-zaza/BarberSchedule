@@ -1,0 +1,6 @@
+/* Layout-specific tweaks. El navbar usa glass effect ya en styles.css. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--color-ink-950);
+}

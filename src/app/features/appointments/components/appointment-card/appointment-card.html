@@ -1,0 +1,81 @@
+<article
+  class="glass rounded-2xl p-5 tilt-3d group"
+  [class]="compact() ? 'space-y-2' : 'space-y-3'"
+  appTiltOnHover
+  [intensity]="8"
+>
+  <!-- Header: service icon + status badge -->
+  <div class="flex items-start justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div
+        class="w-12 h-12 rounded-xl bg-brand-500/10 ring-1 ring-brand-500/30 grid place-items-center text-2xl"
+      >
+        {{ service()?.icon ?? '✂️' }}
+      </div>
+      <div>
+        <h3 class="font-display text-lg font-semibold text-ink-100 leading-tight">
+          {{ appointment().clientName }}
+        </h3>
+        <p class="text-ink-400 text-xs mt-0.5">
+          📞 {{ appointment().phone }}
+        </p>
+      </div>
+    </div>
+    <app-status-badge [status]="appointment().status" size="sm" />
+  </div>
+
+  <!-- Service + barber -->
+  <div class="space-y-1 text-sm">
+    <div class="flex items-center gap-2 text-ink-200">
+      <span class="text-ink-500">Servicio:</span>
+      <span class="font-medium">{{ service()?.name ?? '—' }}</span>
+      @if (service(); as svc) {
+        <span class="text-ink-500 text-xs">· {{ svc.duration }} min · ${{ svc.price }}</span>
+      }
+    </div>
+    <div class="flex items-center gap-2 text-ink-200">
+      <span class="text-ink-500">Barbero:</span>
+      <span class="font-medium">{{ barber()?.name ?? '—' }}</span>
+      @if (barber(); as b) {
+        <span class="text-ink-500 text-xs">· {{ b.specialty }}</span>
+      }
+    </div>
+  </div>
+
+  <!-- Date + time -->
+  <div class="flex items-center gap-3 pt-2 border-t border-white/5">
+    <div class="flex items-center gap-1.5 text-brand-300 text-sm font-medium">
+      <span>📅</span>
+      <time>{{ appointment().date }}</time>
+    </div>
+    <span class="text-ink-700">·</span>
+    <div class="flex items-center gap-1.5 text-brand-300 text-sm font-medium">
+      <span>⏰</span>
+      <time>{{ appointment().time }}</time>
+    </div>
+  </div>
+
+  <!-- Notes (optional) -->
+  @if (appointment().notes) {
+    <p class="text-xs text-ink-400 italic bg-white/3 rounded-lg p-2 border border-white/5">
+      💬 {{ appointment().notes }}
+    </p>
+  }
+
+  <!-- Actions -->
+  @if (actions().length > 0) {
+    <div class="flex flex-wrap gap-2 pt-2">
+      @for (a of actions(); track a.key) {
+        <button
+          type="button"
+          (click)="onAction(a.key)"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+          [class]="actionClass(a.variant)"
+        >
+          <span>{{ a.icon }}</span>
+          {{ a.label }}
+        </button>
+      }
+    </div>
+  }
+</article>

@@ -1,0 +1,260 @@
+<section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <!-- Header -->
+  <div class="mb-8">
+    <a routerLink="/citas" class="text-ink-500 hover:text-ink-200 text-sm inline-flex items-center gap-1 mb-3 transition-colors">
+      ← Volver a citas
+    </a>
+    <h1 class="text-4xl sm:text-5xl font-display font-bold">
+      {{ isEdit() ? 'Editar cita' : 'Nueva cita' }}
+    </h1>
+    <p class="text-ink-400 mt-1 text-sm">
+      {{ isEdit() ? 'Modifica los datos de la cita existente.' : 'Sigue los pasos para agendar.' }}
+    </p>
+  </div>
+
+  <!-- Stepper indicator -->
+  <ol class="flex items-center mb-8" aria-label="Progreso">
+    @for (label of stepLabels; track label; let i = $index) {
+      <li class="flex items-center" [class.flex-1]="i < stepLabels.length - 1">
+        <button
+          type="button"
+          (click)="goTo($any(i + 1))"
+          [disabled]="i + 1 > currentStep()"
+          class="flex items-center gap-2 group"
+        >
+          <span
+            class="w-9 h-9 rounded-full grid place-items-center font-semibold text-sm transition-all"
+            [ngClass]="i + 1 < currentStep()
+              ? 'bg-brand-500 text-ink-950'
+              : i + 1 === currentStep()
+                ? 'bg-brand-500/20 text-brand-300 ring-2 ring-brand-500'
+                : 'bg-white/5 text-ink-500 ring-1 ring-white/10'"
+          >
+            @if (i + 1 < currentStep()) { ✓ } @else { {{ i + 1 }} }
+          </span>
+          <span
+            class="hidden sm:inline text-sm font-medium transition-colors"
+            [ngClass]="i + 1 === currentStep() ? 'text-ink-100' : 'text-ink-500'"
+          >
+            {{ label }}
+          </span>
+        </button>
+        @if (i < stepLabels.length - 1) {
+          <div
+            class="flex-1 h-px mx-2 transition-colors"
+            [ngClass]="i + 1 < currentStep() ? 'bg-brand-500' : 'bg-white/10'"
+          ></div>
+        }
+      </li>
+    }
+  </ol>
+
+  <!-- Error global -->
+  @if (errorMsg()) {
+    <div class="mb-6 px-4 py-3 rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30 text-rose-200 text-sm">
+      ⚠️ {{ errorMsg() }}
+    </div>
+  }
+
+  <!-- Form -->
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="glass rounded-2xl p-6 sm:p-8">
+    <!-- STEP 1: Servicio -->
+    @if (currentStep() === 1) {
+      <div class="step-pane">
+        <h2 class="font-display text-2xl font-semibold mb-2">Elige un servicio</h2>
+        <p class="text-ink-400 text-sm mb-6">Selecciona lo que necesitas hoy.</p>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          @for (s of services(); track s.id) {
+            <button
+              type="button"
+              (click)="selectService(s.id)"
+              [ngClass]="isServiceSelected(s.id)
+                ? 'ring-2 ring-brand-500 bg-brand-500/10'
+                : 'bg-white/3 hover:bg-white/8 ring-1 ring-white/10'"
+              class="text-left p-4 rounded-xl transition-all hover:-translate-y-0.5"
+            >
+              <div class="text-3xl mb-2">{{ s.icon }}</div>
+              <div class="font-semibold text-ink-100">{{ s.name }}</div>
+              <div class="text-xs text-ink-400 mt-1">
+                {{ s.duration }} min · ${{ s.price }}
+              </div>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- STEP 2: Barbero + fecha + hora -->
+    @if (currentStep() === 2) {
+      <div class="step-pane space-y-6">
+        <div>
+          <h2 class="font-display text-2xl font-semibold mb-2">Elige tu barbero</h2>
+          <p class="text-ink-400 text-sm mb-4">Todos están disponibles.</p>
+          <div class="grid sm:grid-cols-3 gap-3">
+            @for (b of barbersSv(); track b.id) {
+              <button
+                type="button"
+                (click)="selectBarber(b.id)"
+                [ngClass]="isBarberSelected(b.id)
+                  ? 'ring-2 ring-brand-500 bg-brand-500/10'
+                  : 'bg-white/3 hover:bg-white/8 ring-1 ring-white/10'"
+                class="text-center p-4 rounded-xl transition-all"
+              >
+                <div class="text-4xl mb-1">{{ b.avatar }}</div>
+                <div class="font-semibold text-sm">{{ b.name }}</div>
+                <div class="text-xs text-ink-400 mt-1">{{ b.specialty }}</div>
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-sm font-medium text-ink-200 mb-1.5 block">📅 Fecha</span>
+            <input
+              type="date"
+              formControlName="date"
+              [min]="getDateMin()"
+              class="w-full px-4 py-2.5 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 transition-all"
+            />
+          </label>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-medium text-ink-200 mb-3">⏰ Horario disponible</h3>
+          @if (!form.controls.barberId.value || !form.controls.date.value) {
+            <p class="text-ink-500 text-sm italic">Selecciona barbero y fecha para ver horarios.</p>
+          } @else {
+            <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
+              @for (slot of timeSlots; track slot) {
+                @if (isTimeOccupied(slot)) {
+                  <span
+                    class="px-2 py-2 rounded-lg text-center text-xs font-medium bg-rose-500/5 text-rose-300/40 line-through cursor-not-allowed ring-1 ring-rose-500/10"
+                    title="Ocupado"
+                  >
+                    {{ slot }}
+                  </span>
+                } @else {
+                  <button
+                    type="button"
+                    (click)="selectTime(slot)"
+                    [ngClass]="isTimeSelected(slot)
+                      ? 'bg-brand-500 text-ink-950 shadow-md shadow-brand-500/30'
+                      : 'bg-white/5 hover:bg-white/10 text-ink-200'"
+                    class="px-2 py-2 rounded-lg text-center text-xs font-medium ring-1 ring-white/10 transition-all"
+                  >
+                    {{ slot }}
+                  </button>
+                }
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- STEP 3: Datos del cliente -->
+    @if (currentStep() === 3) {
+      <div class="step-pane space-y-5">
+        <div>
+          <h2 class="font-display text-2xl font-semibold mb-2">Datos del cliente</h2>
+          <p class="text-ink-400 text-sm">Para confirmar la cita y enviarte recordatorios.</p>
+        </div>
+
+        <label class="block">
+          <span class="text-sm font-medium text-ink-200 mb-1.5 block">Nombre completo *</span>
+          <input
+            type="text"
+            formControlName="clientName"
+            placeholder="Ej. Juan Pérez"
+            class="w-full px-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all"
+          />
+          @if (form.controls.clientName.touched && form.controls.clientName.invalid) {
+            <span class="text-xs text-rose-300 mt-1 block">Mínimo 2 caracteres.</span>
+          }
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-medium text-ink-200 mb-1.5 block">Teléfono *</span>
+          <input
+            type="tel"
+            formControlName="phone"
+            placeholder="555-0101"
+            class="w-full px-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all"
+          />
+          @if (form.controls.phone.touched && form.controls.phone.invalid) {
+            <span class="text-xs text-rose-300 mt-1 block">Solo dígitos, espacios, guiones o +.</span>
+          }
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-medium text-ink-200 mb-1.5 block">Notas (opcional)</span>
+          <textarea
+            formControlName="notes"
+            rows="3"
+            placeholder="Preferencias, alergias, detalles…"
+            class="w-full px-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all resize-none"
+          ></textarea>
+        </label>
+
+        <!-- Resumen -->
+        <div class="mt-4 p-4 rounded-xl bg-white/3 ring-1 ring-white/5">
+          <h3 class="text-xs uppercase tracking-widest text-ink-500 mb-2">Resumen</h3>
+          <div class="text-sm space-y-1 text-ink-200">
+            <div>✂️ Servicio: <strong>{{ services().find(s => s.id === form.value.serviceId)?.name }}</strong></div>
+            <div>💈 Barbero: <strong>{{ barbersSv().find(b => b.id === form.value.barberId)?.name }}</strong></div>
+            <div>📅 Fecha: <strong>{{ form.value.date }}</strong> · ⏰ <strong>{{ form.value.time }}</strong></div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Footer / nav -->
+    <div class="flex items-center justify-between mt-8 pt-6 border-t border-white/5">
+      <button
+        type="button"
+        (click)="back()"
+        [disabled]="currentStep() === 1"
+        class="px-5 py-2.5 rounded-full text-sm font-medium text-ink-200 hover:bg-white/5 ring-1 ring-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        ← Atrás
+      </button>
+
+      @if (currentStep() < 3) {
+        <button
+          type="button"
+          (click)="next()"
+          [disabled]="!canAdvance()"
+          class="px-7 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold text-sm transition-all shadow-lg shadow-brand-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Siguiente →
+        </button>
+      } @else {
+        <button
+          type="submit"
+          [disabled]="form.invalid || submitting()"
+          class="px-7 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold text-sm transition-all shadow-lg shadow-brand-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          @if (submitting()) {
+            Guardando…
+          } @else if (isEdit()) {
+            Guardar cambios
+          } @else {
+            ✓ Agendar cita
+          }
+        </button>
+      }
+    </div>
+  </form>
+</section>
+
+<style>
+  .step-pane {
+    animation: step-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes step-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+</style>

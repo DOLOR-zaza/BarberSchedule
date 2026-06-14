@@ -1,0 +1,107 @@
+<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <!-- Header -->
+  <div class="text-center mb-12">
+    <span class="inline-block px-4 py-1.5 rounded-full bg-brand-500/10 ring-1 ring-brand-500/30 text-brand-300 text-xs font-medium tracking-widest uppercase mb-4">
+      Nuestros servicios
+    </span>
+    <h1 class="text-5xl sm:text-6xl font-display font-bold mb-4">
+      ¿Qué te <span class="text-brand-400 italic">hacemos</span> hoy?
+    </h1>
+    <p class="text-ink-300 text-lg max-w-2xl mx-auto">
+      Pasa el mouse (o toca) cada tarjeta para ver precio y duración.
+      Click en <strong class="text-brand-300">Agendar</strong> para reservar.
+    </p>
+  </div>
+
+  <!-- Loading skeleton -->
+  @if (loading() && services().length === 0) {
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="aspect-[4/5] glass rounded-2xl animate-pulse"></div>
+      }
+    </div>
+  }
+
+  <!-- Grid de flip cards -->
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    @for (s of services(); track s.id) {
+      <div
+        class="flip-3d aspect-[4/5] cursor-pointer"
+        [class.flipped]="isFlipped(s.id)"
+        (click)="toggleFlip(s.id)"
+        role="button"
+        tabindex="0"
+        [attr.aria-label]="'Servicio ' + s.name"
+      >
+        <div class="flip-3d-inner rounded-2xl shadow-2xl shadow-black/40">
+          <!-- FRENTE -->
+          <div
+            class="flip-3d-face glass rounded-2xl p-6 flex flex-col items-center justify-center text-center overflow-hidden relative"
+          >
+            <!-- Decoración: anillo pulsante -->
+            <div class="absolute inset-0 mesh-gradient opacity-30"></div>
+
+            <div class="relative z-10">
+              <div class="text-8xl mb-4 drop-shadow-lg">{{ s.icon }}</div>
+              <h3 class="font-display text-2xl font-bold text-ink-100 leading-tight">
+                {{ s.name }}
+              </h3>
+              <div class="mt-4 flex items-center gap-1.5 text-ink-500 text-xs">
+                <span class="inline-block animate-pulse">👆</span>
+                <span>Toca para ver más</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- REVERSO -->
+          <div
+            class="flip-3d-face flip-3d-back rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-gradient-to-br from-brand-500 to-brand-700 text-ink-950 relative overflow-hidden"
+          >
+            <!-- Decoración: líneas diagonales sutiles -->
+            <div class="absolute inset-0 opacity-10"
+                 style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,.2) 10px, rgba(0,0,0,.2) 20px);">
+            </div>
+
+            <div class="relative z-10">
+              <div class="text-5xl mb-2">{{ s.icon }}</div>
+              <h3 class="font-display text-xl font-bold mb-4 leading-tight">
+                {{ s.name }}
+              </h3>
+
+              <div class="text-5xl font-display font-black mb-1">
+                ${{ s.price }}
+              </div>
+              <div class="text-sm font-medium opacity-80 mb-6">
+                ⏱ {{ s.duration }} minutos
+              </div>
+
+              <button
+                type="button"
+                (click)="bookService(s.id, $event)"
+                class="px-6 py-2.5 rounded-full bg-ink-950 text-brand-300 font-bold text-sm hover:bg-ink-900 transition-all shadow-lg hover:scale-105"
+              >
+                Agendar →
+              </button>
+
+              <div class="mt-4 text-xs opacity-70">
+                Click fuera para voltear
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- CTA final -->
+  <div class="mt-16 glass rounded-2xl p-8 text-center">
+    <h2 class="font-display text-2xl font-bold mb-2">¿No encuentras lo que buscas?</h2>
+    <p class="text-ink-400 mb-4">Pregúntale a BarberBot, te ayuda a elegir.</p>
+    <a
+      routerLink="/asistente"
+      class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 text-ink-950 font-semibold"
+    >
+      🤖 Hablar con BarberBot
+    </a>
+  </div>
+</section>

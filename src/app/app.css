@@ -1,0 +1,5 @@
+/* App root: no styles, layout owns the chrome */
+:host {
+  display: block;
+  min-height: 100vh;
+}

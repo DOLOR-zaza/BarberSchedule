@@ -1,0 +1,129 @@
+{
+  "appointments": [
+    {
+      "id": 1,
+      "clientName": "Juan Pérez",
+      "phone": "555-0101",
+      "serviceId": 1,
+      "barberId": 1,
+      "date": "2026-06-15",
+      "time": "10:00",
+      "status": "confirmada",
+      "notes": "Cliente regular, prefiere corte bajo en los lados"
+    },
+    {
+      "id": 2,
+      "clientName": "María López",
+      "phone": "555-0202",
+      "serviceId": 3,
+      "barberId": 2,
+      "date": "2026-06-15",
+      "time": "11:30",
+      "status": "pendiente",
+      "notes": ""
+    },
+    {
+      "id": 3,
+      "clientName": "Carlos Ruiz",
+      "phone": "555-0303",
+      "serviceId": 2,
+      "barberId": 1,
+      "date": "2026-06-15",
+      "time": "16:00",
+      "status": "confirmada",
+      "notes": "Degradado alto"
+    },
+    {
+      "id": 4,
+      "clientName": "Ana Torres",
+      "phone": "555-0404",
+      "serviceId": 4,
+      "barberId": 3,
+      "date": "2026-06-16",
+      "time": "12:00",
+      "status": "atendida",
+      "notes": ""
+    },
+    {
+      "id": 5,
+      "clientName": "Pedro Sánchez",
+      "phone": "555-0505",
+      "serviceId": 5,
+      "barberId": 2,
+      "date": "2026-06-16",
+      "time": "15:30",
+      "status": "cancelada",
+      "notes": "Cliente canceló por viaje"
+    }
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "Corte clásico",
+      "duration": 30,
+      "price": 120,
+      "icon": "✂️"
+    },
+    {
+      "id": 2,
+      "name": "Corte degradado",
+      "duration": 45,
+      "price": 180,
+      "icon": "💈"
+    },
+    {
+      "id": 3,
+      "name": "Barba",
+      "duration": 30,
+      "price": 100,
+      "icon": "🪒"
+    },
+    {
+      "id": 4,
+      "name": "Corte + barba",
+      "duration": 60,
+      "price": 250,
+      "icon": "💇"
+    },
+    {
+      "id": 5,
+      "name": "Tinte",
+      "duration": 60,
+      "price": 280,
+      "icon": "🎨"
+    },
+    {
+      "id": 6,
+      "name": "Diseño",
+      "duration": 45,
+      "price": 200,
+      "icon": "⚡"
+    }
+  ],
+  "barbers": [
+    {
+      "id": 1,
+      "name": "Carlos Méndez",
+      "specialty": "Degradados y diseños",
+      "available": true,
+      "avatar": "🧔",
+      "experience": 8
+    },
+    {
+      "id": 2,
+      "name": "Luis Rodríguez",
+      "specialty": "Corte clásico y barba",
+      "available": true,
+      "avatar": "👨‍🦱",
+      "experience": 5
+    },
+    {
+      "id": 3,
+      "name": "Andrés Vega",
+      "specialty": "Tinte y color",
+      "available": true,
+      "avatar": "👨",
+      "experience": 3
+    }
+  ]
+}

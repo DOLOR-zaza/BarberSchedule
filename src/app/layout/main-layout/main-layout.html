@@ -1,0 +1,104 @@
+<!-- Skip to main content (a11y) -->
+<a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+
+<!-- Navbar flotante con glass effect -->
+<header
+  class="sticky top-0 z-40 transition-all duration-300"
+  [class.glass]="true"
+  [class.shadow-2xl]="true"
+  role="banner"
+>
+  <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- Logo -->
+    <a routerLink="/inicio" class="flex items-center gap-2 group" (click)="closeMobile()">
+      <span class="text-3xl transition-transform group-hover:rotate-12 group-hover:scale-110">💈</span>
+      <div class="leading-tight">
+        <div class="font-display text-xl font-bold text-brand-300 tracking-tight">Barber</div>
+        <div class="font-display text-xl font-bold text-brand-500 -mt-1 tracking-tight">Schedule</div>
+      </div>
+    </a>
+
+    <!-- Desktop nav -->
+    <ul class="hidden md:flex items-center gap-1">
+      @for (item of navItems; track item.path) {
+        <li>
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="!text-brand-300 !bg-brand-500/10 ring-1 ring-brand-500/30"
+            class="px-4 py-2 rounded-full text-sm font-medium text-ink-200 hover:text-brand-200 hover:bg-white/5 transition-all flex items-center gap-2"
+          >
+            <span class="text-base">{{ item.icon }}</span>
+            {{ item.label }}
+          </a>
+        </li>
+      }
+    </ul>
+
+    <!-- CTA -->
+    <a
+      routerLink="/nueva-cita"
+      class="hidden md:inline-flex items-center gap-2 px-5 py-2 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold text-sm transition-all shadow-lg shadow-brand-500/20 hover:shadow-brand-500/40 hover:-translate-y-0.5"
+    >
+      <span>＋</span> Nueva cita
+    </a>
+
+    <!-- Mobile toggle -->
+    <button
+      type="button"
+      class="md:hidden p-2 text-2xl text-ink-100"
+      (click)="toggleMobile()"
+      [attr.aria-expanded]="mobileOpen()"
+      aria-label="Abrir menú"
+    >
+      {{ mobileOpen() ? '✕' : '☰' }}
+    </button>
+  </nav>
+
+  <!-- Mobile menu -->
+  @if (mobileOpen()) {
+    <div class="md:hidden border-t border-white/5 bg-ink-950/95 backdrop-blur-lg" role="navigation" aria-label="Menú móvil">
+      <ul class="px-4 py-3 space-y-1">
+        @for (item of navItems; track item.path) {
+          <li>
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="!text-brand-300 !bg-brand-500/15"
+              (click)="closeMobile()"
+              class="flex items-center gap-3 px-4 py-3 rounded-xl text-ink-100 hover:bg-white/5 transition-colors"
+            >
+              <span class="text-xl" aria-hidden="true">{{ item.icon }}</span>
+              <span class="font-medium">{{ item.label }}</span>
+            </a>
+          </li>
+        }
+        <li class="pt-2">
+          <a
+            routerLink="/nueva-cita"
+            (click)="closeMobile()"
+            class="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-brand-500 text-ink-950 font-bold"
+          >
+            <span aria-hidden="true">＋</span> Agendar cita
+          </a>
+        </li>
+      </ul>
+    </div>
+  }
+</header>
+
+<!-- Page content -->
+<main id="main-content" class="route-enter min-h-[calc(100vh-4rem)]" tabindex="-1">
+  <router-outlet />
+</main>
+
+<!-- Footer simple -->
+<footer class="border-t border-white/5 py-8 mt-20">
+  <div class="max-w-7xl mx-auto px-4 text-center text-ink-500 text-sm">
+    <p>
+      <span class="text-brand-400">💈 BarberSchedule</span> ·
+      Hecho con Angular 21 + Tailwind v4 · {{ 2026 }}
+    </p>
+  </div>
+</footer>
+
+<!-- Error boundary global -->
+<app-error-boundary />
