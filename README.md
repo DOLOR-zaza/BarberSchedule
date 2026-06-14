@@ -1,26 +1,27 @@
 # 💈 BarberSchedule
 
-> Sistema de gestión de citas para una barbería — hecho con **Angular 21**, **Tailwind v4** y un **barber pole 3D hipnotizante** generado proceduralmente con Three.js.
+> Sistema de gestión de citas para una barbería — hecho con **Angular 21**, **Tailwind v4** y un **barber pole 3D ** generado proceduralmente con Three.js.
 
 ![Angular](https://img.shields.io/badge/Angular-21.2-DD0031?logo=angular&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38B2AC?logo=tailwindcss&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-latest-000000?logo=three.js&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
 
-Aplicación full-stack de agenda para barbería, con un hero 3D que renderiza un poste de barbería con **illusion effect real** (las franjas se ven subiendo) sin usar imágenes externas — todo se genera en un `<canvas>` con `ImageData` y se anima cada frame.
+Aplicación de agenda para barbería, con un hero 3D que renderiza un poste de barbería con **illusion effect real** (las franjas se ven subiendo) sin usar imágenes externas — todo se genera en un `<canvas>` con `ImageData` y se anima cada frame.
 
 ---
 
 ## ✨ Características
 
 ### 🏠 **Inicio**
+
 - Hero 3D con barber pole animado proceduralmente (Canvas2D + Three.js)
 - Estadísticas con contadores animados
 - Próximas 3 citas
 - Acciones rápidas
 
 ### 📅 **Citas**
+
 - Lista con filtros por estado y búsqueda debounced
 - Confirmación antes de eliminar
 - Acciones inline: confirmar, atender, cancelar
@@ -29,25 +30,29 @@ Aplicación full-stack de agenda para barbería, con un hero 3D que renderiza un
 - Soporte de `?service=N` y `?barber=N` en URL
 
 ### ✂️ **Servicios**
+
 - Tarjetas con efecto 3D flip
 - Vista de detalle por servicio
 - Búsqueda y filtros
 
 ### 💈 **Barberos**
+
 - Cards con efecto tilt
 - Vista por barbero con sus servicios y citas
 - Búsqueda por especialidad
 
 ### 🤖 **Asistente (BarberBot)**
+
 - 32+ intents rule-based
 - Detección fuzzy de servicios (longest match wins)
 - 41 quick replies contextuales
 - Burbujas animadas
 - Indicador de typing
-- Cero IA externa (todo local, todo explicable)
+- Cero IA externa (todo local)
 
 ### 🛠️ **Extras**
-- Error boundary global con UI elegante
+
+- Error boundary global con UI
 - Skip link para lectores de pantalla
 - `prefers-reduced-motion` respetado
 - View Transitions API
@@ -57,37 +62,42 @@ Aplicación full-stack de agenda para barbería, con un hero 3D que renderiza un
 
 ## 🛠 Stack técnico
 
-| Capa | Tecnología |
-|------|-----------|
-| **Framework** | Angular 21.2.8 (standalone components, signals, zoneless) |
-| **Estilos** | Tailwind CSS v4 (nueva sintaxis `bg-X/N`) |
-| **3D** | Three.js (sin librerías de abstracción) |
-| **Animaciones** | GSAP + CSS nativas |
-| **Formularios** | Reactive Forms + `toSignal()` para reactividad |
-| **HTTP** | `provideHttpClient` con `fetch` |
-| **Backend mock** | json-server 1.0.0-beta.3 |
-| **TypeScript** | 5.9 |
-| **Node** | 18+ |
+| Capa             | Tecnología                                                |
+| ---------------- | --------------------------------------------------------- |
+| **Framework**    | Angular 21.2.8 (standalone components, signals, zoneless) |
+| **Estilos**      | Tailwind CSS v4 (nueva sintaxis `bg-X/N`)                 |
+| **3D**           | Three.js (sin librerías de abstracción)                   |
+| **Animaciones**  | GSAP + CSS nativas                                        |
+| **Formularios**  | Reactive Forms + `toSignal()` para reactividad            |
+| **HTTP**         | `provideHttpClient` con `fetch`                           |
+| **Backend mock** | json-server 1.0.0-beta.3                                  |
+| **TypeScript**   | 5.9                                                       |
+| **Node**         | 18+                                                       |
 
 ---
 
 ## 🚀 Setup en 3 pasos
 
 ### 1. Instalar dependencias
+
 ```bash
 npm install
 ```
 
 ### 2. Levantar json-server (en otra terminal)
+
 ```bash
 npm run server
 ```
+
 Crea un servidor REST en `http://localhost:3000` con los datos de `db.json`.
 
 ### 3. Levantar Angular
+
 ```bash
 npm start
 ```
+
 Abre `http://localhost:4200`.
 
 > **Tip:** `Ctrl+Shift+R` para hard refresh si la cache te miente.
@@ -121,17 +131,18 @@ BarberSchedule/
 ## 🎨 Sistema de diseño
 
 ### Colores (brand)
+
 ```css
---color-brand-300: #f5b942
---color-brand-400: #fcd34d
---color-brand-500: #fbbf24
+--color-brand-300: #f5b942 --color-brand-400: #fcd34d --color-brand-500: #fbbf24;
 ```
 
 ### Tipografía
+
 - **Display:** `Bebas Neue` (headings)
 - **Body:** `Inter` (texto)
 
 ### Espaciado
+
 - Basado en rem con escala 4-8-12-16-24-32-48-64
 
 ---
@@ -147,6 +158,7 @@ const bandIdx = Math.floor(phase * bands);
 ```
 
 Donde:
+
 - `u = x / W` (normalizada horizontal)
 - `v = y / H` (normalizada vertical)
 - `turns = 4` (vueltas verticales)
@@ -191,9 +203,3 @@ npm run watch       # build watch
 - **Signals:** reactividad fina, no zone-based
 
 ---
-
-## 📝 Licencia
-
-MIT © 2026 BarberSchedule Team
-
-Hecho con 💈 + ☕ para presentaciones universitarias.
