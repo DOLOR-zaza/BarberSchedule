@@ -1,0 +1,100 @@
+{
+  "name": "BarberSchedule - Chatbot AI (DeepSeek)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "barberschedule-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook (Chat)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "REEMPLAZA-CON-TU-ID"
+    },
+    {
+      "parameters": {
+        "functionCode": "// ─────────────────────────────────────────────────────────────────\n// Construye el payload para DeepSeek con system prompt + historia\n// ─────────────────────────────────────────────────────────────────\nconst input = $input.first().json.body || $input.first().json;\nconst userMessage = (input.message || '').toString().slice(0, 1000);\nconst history = Array.isArray(input.history) ? input.history.slice(-10) : [];\nconst userName = input.userName || 'cliente';\n\nconst SYSTEM_PROMPT = `Eres BarberBot, el asistente virtual oficial de la barbería **BarberSchedule**. Tu objetivo es ayudar a los clientes a agendar citas, conocer servicios, y resolver dudas sobre la barbería.\n\n# TONO Y ESTILO\n- Habla en **español mexicano casual** pero profesional. Tutea al usuario.\n- Sé **breve y amigable**. Mensajes de 2-4 oraciones máximo.\n- Usa **1-2 emojis** por mensaje, no más.\n- Si el usuario escribe en **inglés u otro idioma**, responde en ese mismo idioma.\n- Adapta tu tono: si es joven/casual, sé relajado; si es formal, sé más serio.\n\n# CATÁLOGO DE SERVICIOS (usa estos precios, no inventes)\n- **Corte clásico** (id=1) — 30 min — $120\n- **Corte degradado** (id=2) — 30 min — $150  \n- **Barba** (id=3) — 30 min — $100\n- **Corte + barba** (id=4) — 45 min — $230\n- **Tinte** (id=5) — 60 min — $350\n- **Diseño** (id=6) — 45 min — $200\n\n# EQUIPO DE BARBEROS\n- **Carlos Ruiz** (id=1) — Clásico, 5 años de experiencia\n- **Miguel Ángel** (id=2) — Degradados, 7 años de experiencia\n- **Luis Hernández** (id=3) — Diseños, 3 años de experiencia\n\n# HORARIOS\n- Lunes a viernes: 10:00 — 20:00\n- Sábado: 10:00 — 18:00\n- Domingo: cerrado\n\n# UBICACIÓN Y CONTACTO\n- Estamos en el centro de la ciudad. La dirección exacta se manda por WhatsApp al confirmar.\n- WhatsApp: +52 555 010 1010\n- Email: hola@barberschedule.app\n- Formas de pago: efectivo, tarjeta débito/crédito, transferencia\n\n# LO QUE PUEDES HACER\n1. Responder sobre servicios, precios, barberos, horarios, ubicación, contacto\n2. Recomendar servicios según lo que el usuario busca\n3. Comparar opciones (ej: \"¿qué diferencia hay entre fade bajo y medio?\")\n4. Ayudar a agendar (usar la herramienta bookService)\n5. Responder dudas generales sobre cortes, mantenimiento, etc.\n6. Detectar frustración y sugerir contacto humano\n\n# LO QUE NO DEBES HACER\n- No inventes precios, servicios o barberos\n- No prometas descuentos no autorizados\n- No des opiniones médicas o legales\n- No hables de temas fuera de la barbería (si insisten, redirige amablemente)\n- No des datos personales de otros clientes\n\n# HERRAMIENTAS DISPONIBLES\nTienes 3 herramientas (function calling) que puedes usar cuando sea apropiado:\n- **bookService**: cuando el usuario quiera agendar un servicio. Pasa el serviceId.\n- **viewBarber**: cuando pregunten por un barbero específico. Pasa el barberId.\n- **viewServices**: cuando pidan ver todos los servicios disponibles.\n\nCuando uses una herramienta, el sistema la ejecutará y te dará el resultado, luego tú lo presentarás al usuario de forma natural.\n\n# INSTRUCCIONES DE USO DE HERRAMIENTAS\n- Si el usuario dice algo como \"quiero agendar corte clásico\" → usa bookService(serviceId: 1)\n- Si dice \"me interesa el degradado, cuánto cuesta?\" → responde el precio SIN usar herramienta, solo informativo\n- Si pregunta \"quién me puede atender?\" → usa viewServices() o sugiere un barbero según la pregunta\n- Si solo navega o pregunta, no uses herramientas innecesarias\n- Las herramientas se usan SOLO cuando el usuario explícitamente quiere agendar o ver algo concreto\n\n# INICIO DE CONVERSACIÓN\n- Si es el primer mensaje, saluda cálidamente y pregunta en qué puedes ayudar\n- Si el usuario ya escribió algo, responde directamente sin repetir el saludo\n\n# FORMATO DE RESPUESTAS\n- Texto plano, sin markdown complejo\n- No uses ** para negritas dentro de tus respuestas (mejor usa MAYÚSCULAS si necesitas énfasis)\n- Si listas servicios, sepáralos con saltos de línea\n\n# FRASES ÚTILES PARA MEXICANOS\n- \"¡Qué onda!\", \"¡Hola! ¿Cómo te echamos la mano?\"\n- \"Con gusto te ayudo\"\n- \"¿Algo más en lo que te pueda ayudar?\"\n- \"¡Nos vemos pronto! 💈\"\n`;\n\nconst messages = [\n  { role: 'system', content: SYSTEM_PROMPT },\n  ...history,\n  { role: 'user', content: userMessage }\n];\n\nreturn {\n  json: {\n    model: 'deepseek-chat',\n    messages,\n    temperature: 0.7,\n    max_tokens: 500,\n    stream: false,\n    tools: [\n      {\n        type: 'function',\n        function: {\n          name: 'bookService',\n          description: 'Navega al formulario para agendar un servicio específico. Usar cuando el usuario quiera agendar una cita.',\n          parameters: {\n            type: 'object',\n            properties: {\n              serviceId: {\n                type: 'number',\n                description: 'ID del servicio: 1=Corte clásico, 2=Degradado, 3=Barba, 4=Corte+Barba, 5=Tinte, 6=Diseño',\n                enum: [1, 2, 3, 4, 5, 6]\n              },\n              serviceName: {\n                type: 'string',\n                description: 'Nombre del servicio para confirmar'\n              }\n            },\n            required: ['serviceId', 'serviceName']\n          }\n        }\n      },\n      {\n        type: 'function',\n        function: {\n          name: 'viewBarber',\n          description: 'Resalta la información de un barbero específico. Usar cuando pregunten por uno en particular.',\n          parameters: {\n            type: 'object',\n            properties: {\n              barberId: {\n                type: 'number',\n                description: 'ID del barbero: 1=Carlos, 2=Miguel Ángel, 3=Luis',\n                enum: [1, 2, 3]\n              },\n              barberName: {\n                type: 'string'\n              }\n            },\n            required: ['barberId']\n          }\n        }\n      },\n      {\n        type: 'function',\n        function: {\n          name: 'viewServices',\n          description: 'Muestra la lista completa de servicios disponibles. Usar cuando pidan ver todos los servicios.',\n          parameters: {\n            type: 'object',\n            properties: {}\n          }\n        }\n      }\n    ]\n  }\n};"
+      },
+      "id": "format",
+      "name": "Format DeepSeek Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "deepseek",
+      "name": "DeepSeek API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// ─────────────────────────────────────────────────────────────────\n// Procesa la respuesta de DeepSeek.\n// Si llamó a una herramienta, la maneja aquí (en este caso, devuelve\n// una acción que el frontend ejecuta).\n// ─────────────────────────────────────────────────────────────────\nconst response = $input.first().json;\nconst choice = response.choices?.[0];\nconst message = choice?.message;\n\nif (!message) {\n  return {\n    json: {\n      text: 'Lo siento, tuve un problema al procesar tu mensaje. ¿Puedes intentar de nuevo?',\n      action: null,\n    }\n  };\n}\n\n// ¿Llamó a una herramienta?\nif (message.tool_calls && message.tool_calls.length > 0) {\n  const toolCall = message.tool_calls[0];\n  const fnName = toolCall.function.name;\n  let args = {};\n  try {\n    args = JSON.parse(toolCall.function.arguments);\n  } catch (e) {\n    args = {};\n  }\n\n  let action = null;\n\n  if (fnName === 'bookService' && args.serviceId) {\n    action = {\n      type: 'navigate',\n      path: '/nueva-cita',\n      queryParams: { service: args.serviceId },\n      label: `Ir a agendar ${args.serviceName || 'el servicio'}`,\n    };\n  } else if (fnName === 'viewBarber' && args.barberId) {\n    action = {\n      type: 'navigate',\n      path: '/barberos',\n      queryParams: { highlight: args.barberId },\n      label: `Ver perfil de ${args.barberName || 'el barbero'}`,\n    };\n  } else if (fnName === 'viewServices') {\n    action = {\n      type: 'navigate',\n      path: '/servicios',\n      label: 'Ver todos los servicios',\n    };\n  }\n\n  // El bot probablemente incluyó un content también\n  const text = message.content || '¡Va! Aquí te dejo lo que necesitas.';\n\n  return {\n    json: {\n      text,\n      action,\n      toolUsed: fnName,\n    }\n  };\n}\n\n// Respuesta normal sin tool\nreturn {\n  json: {\n    text: message.content || 'Lo siento, no entendí bien. ¿Me lo repites?',\n    action: null,\n  }\n};"
+      },
+      "id": "process",
+      "name": "Process Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond to Angular",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (Chat)": {
+      "main": [[{"node": "Format DeepSeek Request", "type": "main", "index": 0}]]
+    },
+    "Format DeepSeek Request": {
+      "main": [[{"node": "DeepSeek API", "type": "main", "index": 0}]]
+    },
+    "DeepSeek API": {
+      "main": [[{"node": "Process Response", "type": "main", "index": 0}]]
+    },
+    "Process Response": {
+      "main": [[{"node": "Respond to Angular", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [{"name": "barberschedule"}, {"name": "ai-chatbot"}],
+  "active": false,
+  "pinData": {}
+}

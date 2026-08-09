@@ -1,0 +1,74 @@
+{
+  "name": "BarberSchedule - Notificaciones (Email)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "barberschedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "REEMPLAZA-CON-TU-ID"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Enriquece el payload con datos formateados para el email.\nconst payload = $input.first().json.body || $input.first().json;\nconst event = payload.event || 'created';\nconst a = payload.appointment || {};\nconst md = payload.metadata || {};\n\nconst eventEmoji = {\n  created:   '🆕',\n  confirmed: '✅',\n  cancelled: '❌',\n  attended:  '✨',\n  updated:   '🔄',\n  deleted:   '🗑️',\n};\nconst eventTitle = {\n  created:   'Cita agendada',\n  confirmed: 'Cita confirmada',\n  cancelled: 'Cita cancelada',\n  attended:  'Cita atendida',\n  updated:   'Cita actualizada',\n  deleted:   'Cita eliminada',\n};\n\nconst emailSubject = `${eventEmoji[event] || '📅'} ${eventTitle[event] || 'Notificación'} — ${a.clientName || 'Cliente'}`;\n\nconst emailBody = `\n<div style=\"font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background: #1a1a1a;\">\n  <div style=\"background: linear-gradient(135deg, #2ba89a 0%, #d97706 100%); padding: 32px 24px; text-align: center; border-radius: 12px 12px 0 0;\">\n    <div style=\"font-size: 48px; margin-bottom: 8px;\">💈</div>\n    <h1 style=\"color: white; margin: 0; font-size: 28px;\">${eventEmoji[event] || '📅'} ${eventTitle[event] || 'Notificación'}</h1>\n    <p style=\"color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;\">BarberSchedule</p>\n  </div>\n\n  <div style=\"background: #1a1a1a; padding: 32px 24px; color: #f5f5f5;\">\n    <p style=\"font-size: 16px; margin-top: 0;\">Hola <strong style=\"color: #fbbf24;\">${a.clientName || 'Cliente'}</strong>,</p>\n\n    ${event === 'created' ? '<p>Tu cita en BarberSchedule está confirmada. Aquí tienes los detalles:</p>' : ''}\n    ${event === 'confirmed' ? '<p>¡Buenas noticias! Tu cita ha sido confirmada:</p>' : ''}\n    ${event === 'cancelled' ? '<p>Lamentamos informarte que tu cita fue cancelada.</p>' : ''}\n    ${event === 'attended' ? '<p>¡Gracias por tu visita! Esperamos que te haya encantado.</p>' : ''}\n    ${event === 'updated' ? '<p>Tu cita fue actualizada con los siguientes datos:</p>' : ''}\n\n    <table style=\"width: 100%; border-collapse: collapse; margin: 24px 0; background: #262626; border-radius: 8px; overflow: hidden;\">\n      <tr>\n        <td style=\"padding: 14px 16px; color: #999; border-bottom: 1px solid #333; width: 40%;\">📅 Fecha</td>\n        <td style=\"padding: 14px 16px; color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #333;\">${a.date || '—'}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 14px 16px; color: #999; border-bottom: 1px solid #333;\">⏰ Hora</td>\n        <td style=\"padding: 14px 16px; color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #333;\">${a.time || '—'}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 14px 16px; color: #999; border-bottom: 1px solid #333;\">📞 Teléfono</td>\n        <td style=\"padding: 14px 16px; color: #f5f5f5; border-bottom: 1px solid #333;\">${a.phone || '—'}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 14px 16px; color: #999;\">✂️ Notas</td>\n        <td style=\"padding: 14px 16px; color: #f5f5f5;\">${a.notes || 'sin notas'}</td>\n      </tr>\n    </table>\n\n    <div style=\"background: #262626; border-left: 4px solid #2ba89a; padding: 16px; border-radius: 4px; margin: 24px 0;\">\n      <p style=\"margin: 0; color: #f5f5f5;\">${event === 'cancelled' ? 'Si quieres reagendar, entra a la app o contáctanos.' : '¡Te esperamos puntualmente! 💈'}</p>\n    </div>\n\n    <hr style=\"border: none; border-top: 1px solid #333; margin: 24px 0;\">\n\n    <p style=\"color: #888; font-size: 12px; text-align: center; margin: 0;\">\n      — Equipo de BarberSchedule 💈<br>\n      <span style=\"color: #555;\">Si tienes dudas, responde a este correo</span>\n    </p>\n  </div>\n</div>\n`;\n\nreturn [{\n  json: {\n    event,\n    appointment: a,\n    metadata: md,\n    emailSubject,\n    emailBody,\n  }\n}];\n"
+      },
+      "id": "format",
+      "name": "Format Messages",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.appointment.email }}",
+        "subject": "={{ $json.emailSubject }}",
+        "message": "={{ $json.emailBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "email",
+      "name": "Email (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\": true, \"event\": \"{{ $json.event }}\"}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Format Messages", "type": "main", "index": 0}]]
+    },
+    "Format Messages": {
+      "main": [[{"node": "Email (Gmail)", "type": "main", "index": 0}]]
+    },
+    "Email (Gmail)": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [{"name": "barberschedule"}],
+  "active": false,
+  "pinData": {}
+}

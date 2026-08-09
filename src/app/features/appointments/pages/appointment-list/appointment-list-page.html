@@ -1,4 +1,19 @@
 <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <!-- Banner informativo: vista de solo lectura -->
+  <div class="glass rounded-2xl p-4 mb-6 ring-1 ring-white/5 flex items-start gap-3">
+    <span class="text-2xl mt-0.5">👁️</span>
+    <div class="flex-1 text-sm">
+      <p class="text-ink-200">
+        <strong class="text-ink-100">Vista pública</strong> — aquí puedes consultar
+        el estado de las citas. Para modificar una cita, contacta a la barbería
+        o usa el
+        <a routerLink="/asistente" class="text-brand-300 hover:text-brand-200 underline underline-offset-2">
+          asistente virtual
+        </a>.
+      </p>
+    </div>
+  </div>
+
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
     <div>
@@ -94,25 +109,10 @@
       @for (appt of visible(); track appt.id) {
         <app-appointment-card
           [appointment]="appt"
-          (edit)="onEdit($event)"
-          (delete)="onDelete($event)"
-          (confirm)="onConfirm($event)"
-          (attend)="onAttend($event)"
-          (cancel)="onCancel($event)"
+          mode="client"
         />
       }
     </div>
   }
 </section>
 
-<!-- Confirm modal para eliminar -->
-<app-confirm-modal
-  [open]="showDeleteModal()"
-  title="¿Eliminar esta cita?"
-  message="Esta acción no se puede deshacer. La cita se eliminará permanentemente."
-  variant="danger"
-  confirmText="Sí, eliminar"
-  cancelText="Cancelar"
-  (confirm)="onConfirmDelete()"
-  (cancel)="onCancelDelete()"
-/>

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { ErrorBoundary } from '../../shared/components/error-boundary/error-boundary';
+import { InstallPrompt } from '../../shared/components/install-prompt/install-prompt';
 
 interface NavItem {
   label: string;
@@ -11,7 +12,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ErrorBoundary],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ErrorBoundary, InstallPrompt],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

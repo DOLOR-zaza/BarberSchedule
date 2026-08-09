@@ -4,8 +4,8 @@
   "description": "Sistema de gestión de citas para barbería - BarberSchedule",
   "scripts": {
     "ng": "ng",
-    "start": "concurrently -n \"NG,API\" -c \"cyan,magenta\" \"ng serve\" \"npm run server\"",
-    "serve:web": "ng serve",
+    "start": "concurrently -n \"NG,API\" -c \"cyan,magenta\" \"ng serve --no-hmr\" \"npm run server\"",
+    "serve:web": "ng serve --no-hmr",
     "server": "json-server --watch db.json --port 3001 --host 127.0.0.1",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
@@ -21,6 +21,7 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
+    "@angular/service-worker": "^21.2.17",
     "gsap": "^3.13.0",
     "lottie-web": "^5.13.0",
     "rxjs": "~7.8.0",

@@ -1,28 +1,81 @@
 <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-8rem)] flex flex-col">
   <!-- Header del chat -->
-  <header class="glass rounded-2xl p-4 mb-4 flex items-center gap-4">
-    <div class="relative">
-      <div class="w-14 h-14 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-2xl shadow-lg shadow-brand-500/30">
-        🤖
+  <header class="glass rounded-2xl p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div class="flex items-center gap-4 flex-1 min-w-0">
+      <div class="relative">
+        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-2xl shadow-lg shadow-brand-500/30">
+          @if (bot.mode() === 'ai') {
+            🧠
+          } @else {
+            🤖
+          }
+        </div>
+        <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-ink-950 pulse-ring"></span>
       </div>
-      <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-ink-950 pulse-ring"></span>
+      <div class="flex-1 min-w-0">
+        <h1 class="font-display text-2xl font-bold leading-none flex items-center gap-2">
+          BarberBot
+          @if (bot.mode() === 'ai') {
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40 uppercase tracking-wider font-mono">
+              AI
+            </span>
+          }
+        </h1>
+        <p class="text-ink-400 text-xs mt-1 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          @if (bot.mode() === 'ai') {
+            Powered by DeepSeek · modo inteligente
+          } @else {
+            En línea · modo básico (reglas)
+          }
+        </p>
+      </div>
     </div>
-    <div class="flex-1">
-      <h1 class="font-display text-2xl font-bold leading-none">BarberBot</h1>
-      <p class="text-ink-400 text-xs mt-1 flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        En línea · responde al instante
-      </p>
+
+    <!-- Toggle Rule-based / AI -->
+    <div class="flex items-center gap-1 p-1 bg-ink-900/60 rounded-full ring-1 ring-white/10">
+      <button
+        type="button"
+        (click)="setMode('rule-based')"
+        class="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5"
+        [class]="bot.mode() === 'rule-based'
+          ? 'bg-white/10 text-ink-100'
+          : 'text-ink-400 hover:text-ink-200'"
+        title="Modo básico: respuestas con reglas predefinidas, no requiere internet"
+      >
+        <span>🤖</span> Básico
+      </button>
+      <button
+        type="button"
+        (click)="setMode('ai')"
+        [disabled]="!hasAI()"
+        class="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5"
+        [class]="bot.mode() === 'ai'
+          ? 'bg-violet-500/30 text-violet-100 ring-1 ring-violet-500/40'
+          : 'text-ink-400 hover:text-ink-200 disabled:opacity-40 disabled:cursor-not-allowed'"
+        [title]="hasAI() ? 'Modo AI: entiende lenguaje natural, contexto multi-turn, tool calling' : 'Configura el webhook de AI en /gestion'"
+      >
+        <span>🧠</span> AI
+      </button>
     </div>
+
     <button
       type="button"
       (click)="reset()"
       class="px-3 py-1.5 rounded-full text-xs font-medium text-ink-300 hover:text-ink-100 bg-white/5 hover:bg-white/10 ring-1 ring-white/10 transition-all"
       title="Reiniciar conversación"
     >
-      ↺ Reiniciar
+      ↺
     </button>
   </header>
+
+  <!-- Banner si AI no está configurado -->
+  @if (bot.mode() === 'ai' && !hasAI()) {
+    <div class="glass rounded-2xl p-3 mb-4 ring-1 ring-amber-500/30 bg-amber-500/5 text-sm text-amber-200">
+      ⚠️ El modo AI está activo pero falta configurar el webhook. Ve a
+      <a routerLink="/gestion" class="underline">/gestion</a> y pega la URL.
+    </div>
+  }
 
   <!-- Mensajes -->
   <div class="glass rounded-2xl flex-1 flex flex-col overflow-hidden">
@@ -30,8 +83,13 @@
       @for (m of messages(); track m.id) {
         <div [ngClass]="m.role === 'user' ? 'flex justify-end' : 'flex justify-start gap-2 items-end'">
           @if (m.role === 'bot') {
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-brand-500/20 ring-1 ring-brand-500/30 grid place-items-center text-sm">
-              🤖
+            <div
+              class="flex-shrink-0 w-8 h-8 rounded-full grid place-items-center text-sm ring-1"
+              [class]="m.source === 'ai'
+                ? 'bg-violet-500/20 text-violet-300 ring-violet-500/40'
+                : 'bg-brand-500/20 ring-brand-500/30 text-brand-300'"
+            >
+              @if (m.source === 'ai') { 🧠 } @else { 🤖 }
             </div>
           }
 
@@ -71,14 +129,22 @@
 
       @if (isTyping()) {
         <div class="flex justify-start gap-2 items-end">
-          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-brand-500/20 ring-1 ring-brand-500/30 grid place-items-center text-sm">
-            🤖
+          <div
+            class="flex-shrink-0 w-8 h-8 rounded-full grid place-items-center text-sm ring-1"
+            [class]="bot.mode() === 'ai'
+              ? 'bg-violet-500/20 text-violet-300 ring-violet-500/40'
+              : 'bg-brand-500/20 ring-brand-500/30 text-brand-300'"
+          >
+            @if (bot.mode() === 'ai') { 🧠 } @else { 🤖 }
           </div>
           <div class="bg-ink-900/80 ring-1 ring-white/10 rounded-2xl px-4 py-3">
-            <div class="flex gap-1.5">
+            <div class="flex gap-1.5 items-center">
               <span class="w-2 h-2 rounded-full bg-ink-400 typing-dot"></span>
               <span class="w-2 h-2 rounded-full bg-ink-400 typing-dot"></span>
               <span class="w-2 h-2 rounded-full bg-ink-400 typing-dot"></span>
+              @if (bot.mode() === 'ai') {
+                <span class="ml-2 text-[10px] text-violet-300 font-mono">DeepSeek pensando...</span>
+              }
             </div>
           </div>
         </div>
@@ -96,7 +162,7 @@
           [value]="draft()"
           (input)="draft.set($any($event.target).value)"
           (keydown)="onEnter($event)"
-          placeholder="Escribe un mensaje…"
+          [placeholder]="inputPlaceholder()"
           autocomplete="off"
           class="flex-1 px-4 py-3 rounded-full bg-ink-900/80 border border-white/10 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 text-sm transition-all"
         />
@@ -109,7 +175,12 @@
         </button>
       </form>
       <p class="text-[10px] text-ink-600 text-center mt-2">
-        BarberBot responde con reglas, no con IA real. Prueba: <em>agendar</em>, <em>precios</em>, <em>recomendar</em>
+        @if (bot.mode() === 'ai') {
+          🤖 Modo AI: lenguaje natural, contexto, comparaciones. Configura en
+          <a routerLink="/gestion" class="underline">/gestion</a>
+        } @else {
+          BarberBot responde con reglas. Cambia a AI para lenguaje natural.
+        }
       </p>
     </div>
   </div>
@@ -121,12 +192,16 @@
       <p class="text-xs text-ink-400">Pregunta por servicios y precios</p>
     </div>
     <div class="glass-light rounded-xl p-3">
-      <div class="text-2xl mb-1">⚡</div>
-      <p class="text-xs text-ink-400">Pide una recomendación rápida</p>
+      <div class="text-2xl mb-1">
+        @if (bot.mode() === 'ai') { 🧠 } @else { ⚡ }
+      </div>
+      <p class="text-xs text-ink-400">
+        @if (bot.mode() === 'ai') { Conversación natural con contexto } @else { Pide una recomendación rápida }
+      </p>
     </div>
     <div class="glass-light rounded-xl p-3">
       <div class="text-2xl mb-1">📅</div>
-      <p class="text-xs text-ink-400">Te llevo al formulario con todo pre-seleccionado</p>
+      <p class="text-xs text-ink-400">Te lleva al formulario pre-llenado</p>
     </div>
   </div>
 </section>

@@ -1,9 +1,10 @@
 {
   "appointments": [
     {
-      "id": 1,
+      "id": "1",
       "clientName": "Juan Pérez",
       "phone": "555-0101",
+      "email": "juan.perez@example.com",
       "serviceId": 1,
       "barberId": 1,
       "date": "2026-06-15",
@@ -12,9 +13,10 @@
       "notes": "Cliente regular, prefiere corte bajo en los lados"
     },
     {
-      "id": 2,
+      "id": "2",
       "clientName": "María López",
       "phone": "555-0202",
+      "email": "maria.lopez@example.com",
       "serviceId": 3,
       "barberId": 2,
       "date": "2026-06-15",
@@ -23,9 +25,10 @@
       "notes": ""
     },
     {
-      "id": 3,
+      "id": "3",
       "clientName": "Carlos Ruiz",
       "phone": "555-0303",
+      "email": "carlos.ruiz@example.com",
       "serviceId": 2,
       "barberId": 1,
       "date": "2026-06-15",
@@ -34,9 +37,10 @@
       "notes": "Degradado alto"
     },
     {
-      "id": 4,
+      "id": "4",
       "clientName": "Ana Torres",
       "phone": "555-0404",
+      "email": "ana.torres@example.com",
       "serviceId": 4,
       "barberId": 3,
       "date": "2026-06-16",
@@ -45,55 +49,68 @@
       "notes": ""
     },
     {
-      "id": 5,
+      "id": "5",
       "clientName": "Pedro Sánchez",
       "phone": "555-0505",
+      "email": "pedro.sanchez@example.com",
       "serviceId": 5,
       "barberId": 2,
       "date": "2026-06-16",
       "time": "15:30",
       "status": "cancelada",
       "notes": "Cliente canceló por viaje"
+    },
+    {
+      "serviceId": "2",
+      "barberId": "1",
+      "date": "2026-08-15",
+      "time": "17:30",
+      "clientName": "test12",
+      "phone": "6642516091",
+      "email": "aaron060333@gmail.com",
+      "notes": "",
+      "status": "pendiente",
+      "id": "iJ1v5pWgtPc"
     }
   ],
   "services": [
     {
-      "id": 1,
+      "id": "1",
       "name": "Corte clásico",
       "duration": 30,
       "price": 120,
       "icon": "✂️"
     },
     {
-      "id": 2,
+      "id": "2",
       "name": "Corte degradado",
       "duration": 45,
       "price": 180,
       "icon": "💈"
     },
     {
-      "id": 3,
+      "id": "3",
       "name": "Barba",
       "duration": 30,
       "price": 100,
       "icon": "🪒"
     },
     {
-      "id": 4,
+      "id": "4",
       "name": "Corte + barba",
       "duration": 60,
       "price": 250,
       "icon": "💇"
     },
     {
-      "id": 5,
+      "id": "5",
       "name": "Tinte",
       "duration": 60,
       "price": 280,
       "icon": "🎨"
     },
     {
-      "id": 6,
+      "id": "6",
       "name": "Diseño",
       "duration": 45,
       "price": 200,
@@ -102,7 +119,7 @@
   ],
   "barbers": [
     {
-      "id": 1,
+      "id": "1",
       "name": "Carlos Méndez",
       "specialty": "Degradados y diseños",
       "available": true,
@@ -110,7 +127,7 @@
       "experience": 8
     },
     {
-      "id": 2,
+      "id": "2",
       "name": "Luis Rodríguez",
       "specialty": "Corte clásico y barba",
       "available": true,
@@ -118,12 +135,13 @@
       "experience": 5
     },
     {
-      "id": 3,
+      "id": "3",
       "name": "Andrés Vega",
       "specialty": "Tinte y color",
       "available": true,
       "avatar": "👨",
       "experience": 3
     }
-  ]
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
 }

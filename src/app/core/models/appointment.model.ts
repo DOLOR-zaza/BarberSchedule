@@ -3,12 +3,13 @@ import { AppointmentStatus } from './appointment-status.model';
 /**
  * Cita agendada. Contiene referencias a servicio y barbero por id
  * para mantener la entidad ligera en json-server.
- * El cliente siempre trae nombre y teléfono (sin auth).
+ * El cliente siempre trae nombre, teléfono y email (sin auth).
  */
 export interface Appointment {
   id: number;
   clientName: string;
   phone: string;
+  email: string;
   serviceId: number;
   barberId: number;
   /** YYYY-MM-DD */

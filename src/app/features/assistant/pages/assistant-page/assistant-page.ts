@@ -7,61 +7,59 @@ import {
   inject,
   signal,
   viewChild,
+  computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgClass } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ChatbotService } from '../../../../core/services';
 
-/**
- * Página del asistente BarberBot. Chat completo con:
- *  - Burbujas con animación de entrada
- *  - Typing indicator mientras el bot "piensa"
- *  - Quick reply chips que ejecutan acciones (texto o navegación)
- *  - Sugerencia de servicio: navega a /nueva-cita?service=N
- *  - Auto-scroll al último mensaje
- *  - Botón de reset
- */
 @Component({
   selector: 'app-assistant-page',
-  imports: [FormsModule, NgClass],
+  imports: [FormsModule, NgClass, RouterLink],
   templateUrl: './assistant-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AssistantPage implements AfterViewInit {
-  private bot     = inject(ChatbotService);
+  protected bot     = inject(ChatbotService);
   private router  = inject(Router);
 
-  // Referencias a los elementos del DOM para scroll
   private messagesEnd = viewChild<ElementRef<HTMLDivElement>>('messagesEnd');
   private inputEl     = viewChild<ElementRef<HTMLInputElement>>('inputEl');
 
-  // Estado local
   protected readonly draft = signal<string>('');
 
-  // Selectores del service
   protected readonly messages = this.bot.messages;
   protected readonly isTyping = this.bot.isTyping;
+  protected readonly mode     = this.bot.mode;
+
+  /** True si el modo AI está seleccionado Y tiene webhook configurado */
+  protected readonly hasAI = computed(() => !!this.bot.aiWebhookUrl());
+
+  protected readonly inputPlaceholder = computed(() => {
+    if (this.bot.mode() === 'ai') {
+      return this.bot.aiWebhookUrl()
+        ? 'Pregúntale algo a BarberBot AI…'
+        : 'Configura el webhook AI en /gestion';
+    }
+    return 'Escribe un mensaje…';
+  });
 
   constructor() {
-    // Auto-scroll cuando llegan mensajes o termina de "escribir" el bot
     effect(() => {
-      this.messages();      // depende de messages
-      this.isTyping();      // y de isTyping
+      this.messages();
+      this.isTyping();
       queueMicrotask(() => this.scrollToBottom());
     });
   }
 
   ngAfterViewInit(): void {
-    // Saludo inicial solo si la conversación está vacía
     if (this.messages().length === 0) {
       this.bot.initConversation();
     }
-    // Focus en el input al cargar
     setTimeout(() => this.inputEl()?.nativeElement.focus(), 300);
   }
 
-  // --- Acciones de UI ---
   protected send(): void {
     const text = this.draft();
     if (!text.trim()) return;
@@ -85,10 +83,12 @@ export class AssistantPage implements AfterViewInit {
     this.bot.reset();
   }
 
-  /**
-   * Si el último mensaje del bot sugiere un servicio o barbero, este botón
-   * navega al formulario con los query params que ya sabemos leer.
-   */
+  /** Cambia entre modo básico y AI */
+  protected setMode(mode: 'rule-based' | 'ai'): void {
+    this.bot.configure({ mode });
+    // Si cambia a AI sin webhook configurado, igual lo permite pero avisa
+  }
+
   protected goToSuggestedForm(serviceId?: number, barberId?: number): void {
     const queryParams: Record<string, number> = {};
     if (serviceId) queryParams['service'] = serviceId;

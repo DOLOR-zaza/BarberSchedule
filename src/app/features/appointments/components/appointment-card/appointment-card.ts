@@ -25,7 +25,18 @@ export class AppointmentCard {
   /** Modo compacto para listas densas. Default: false */
   readonly compact = input<boolean>(false);
 
-  /** Mostrar el botón eliminar. Default: true */
+  /**
+   * Modo de la tarjeta.
+   * - 'client': solo lectura, sin botones de acción.
+   *   Para vista pública donde cualquiera puede ver citas ajenas.
+   * - 'admin': todos los botones disponibles.
+   *   Para vista de gestión / personal de la barbería.
+   *
+   * Default: 'admin' (compatibilidad con código existente).
+   */
+  readonly mode = input<'client' | 'admin'>('admin');
+
+  /** @deprecated usar `mode="admin"` en su lugar. */
   readonly showDelete = input<boolean>(true);
 
   // --- Outputs (eventos que el padre escucha) ---
@@ -55,9 +66,17 @@ export class AppointmentCard {
   /**
    * Acciones disponibles según el estado actual.
    * Mantiene la UI declarativa: el padre solo escucha eventos.
+   *
+   * En modo 'client' no se muestra ningún botón — solo lectura.
+   * El cliente ve el estado de la cita pero no puede modificarla.
    */
   protected readonly actions = computed<readonly ActionDef[]>(() => {
     const status: AppointmentStatus = this.appointment().status;
+    const isClient = this.mode() === 'client';
+
+    // En modo cliente: tarjeta puramente informativa, sin botones.
+    if (isClient) return [];
+
     const showDelete = this.showDelete();
     const delBtn: ActionDef = { key: 'delete', label: 'Eliminar', icon: '🗑', variant: 'ghost' };
 

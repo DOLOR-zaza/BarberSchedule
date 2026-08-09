@@ -1,8 +1,11 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { ServiceCatalogService } from './service-catalog.service';
 import { BarberService } from './barber.service';
 
 export type ChatRole = 'user' | 'bot';
+export type ChatMode = 'rule-based' | 'ai';
 
 export interface ChatMessage {
   id: number;
@@ -11,6 +14,8 @@ export interface ChatMessage {
   quickReplies?: string[];
   suggestedServiceId?: number;
   suggestedBarberId?: number;
+  /** Origen: 'rule-based' (local) o 'ai' (DeepSeek via n8n) */
+  source?: 'rule-based' | 'ai';
   timestamp: Date;
 }
 
@@ -21,9 +26,6 @@ export interface BotResponse {
   suggestedBarberId?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  ESTADO DE CONVERSACIÓN — el bot "recuerda"
-// ─────────────────────────────────────────────────────────────────
 interface ChatState {
   lastServiceId?: number;
   lastServiceName?: string;
@@ -33,9 +35,6 @@ interface ChatState {
   lastTopic?: string;
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  UTILIDADES
-// ─────────────────────────────────────────────────────────────────
 function svcDur(min: number): string {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
@@ -47,33 +46,30 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/** Normaliza: lowercase + sin acentos + sin espacios extra */
 function norm(text: string): string {
   return text
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')  // quita acentos
-    .replace(/[¿?¡!.,;:]/g, ' ')       // quita signos
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[¿?¡!.,;:]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/** Detecta servicio por nombre o alias (con normalización) */
 function detectService(
   text: string,
   catalog: { id: number; name: string; duration: number; price: number; icon: string }[],
 ) {
   const lower = norm(text);
   const ALIASES: Record<string, string[]> = {
-    'Corte clásico':    ['corte', 'clasico', 'normal', 'basico', 'corte normal', 'corte clasico'],
-    'Corte degradado':  ['degradado', 'degrade', 'fade', 'desvanecido', 'mid fade', 'low fade', 'high fade', 'skin fade'],
-    'Barba':            ['barba', 'bigote', 'patillas', 'barbilla', 'rasurado', 'afeitar', 'afeitado'],
-    'Corte + barba':    ['combo', 'paquete', 'corte y barba', 'los dos', 'ambos', 'corte con barba'],
-    'Tinte':            ['tinte', 'color', 'pintar', 'pintura', 'matiz', 'tono', 'rubio', 'cafe', 'rojo', 'azul', 'mechas'],
-    'Diseño':           ['diseno', 'dibujar', 'rayita', 'rayas', 'figura', 'tatuaje', 'linea'],
+    'Corte clásico':    ['corte', 'clasico', 'normal', 'basico', 'corte normal', 'corte clasico', 'corte tradicional', 'corte de pelo', 'cortar el pelo', 'me corto el pelo', 'rapar', 'rapado', 'rapada', 'militar', 'hongo', 'cola de pato', 'buzz'],
+    'Corte degradado':  ['degradado', 'degrade', 'fade', 'desvanecido', 'mid fade', 'low fade', 'high fade', 'skin fade', 'fade bajo', 'fade medio', 'fade alto', 'taper', 'mullet', 'texturizado', 'desvanecido'],
+    'Barba':            ['barba', 'bigote', 'patillas', 'barbilla', 'rasurado', 'afeitar', 'afeitado', 'rasurar', 'recortar barba', 'perfilado', 'perfilado de barba', 'mustache', 'bigotito'],
+    'Corte + barba':    ['combo', 'paquete', 'corte y barba', 'los dos', 'ambos', 'corte con barba', 'paquete completo', 'todo', 'todo el servicio', 'corte y bigote', 'corte mas barba', 'combo completo'],
+    'Tinte':            ['tinte', 'color', 'pintar', 'pintura', 'matiz', 'tono', 'rubio', 'cafe', 'rojo', 'azul', 'mechas', 'cambio de color', 'decolorar', 'decoloracion', 'rayos', 'highlights', 'balayage'],
+    'Diseño':           ['diseno', 'dibujar', 'rayita', 'rayas', 'figura', 'tatuaje', 'linea', 'lineas', 'ceja', 'cejas', 'cejas', 'disenos', 'dibujo', 'trazos', 'calado', 'navajado'],
   };
 
-  // 1) Recolectar TODAS las coincidencias por nombre con su longitud
   const nameMatches: { svc: typeof catalog[0]; len: number }[] = [];
   for (const s of catalog) {
     const n = norm(s.name);
@@ -82,11 +78,9 @@ function detectService(
     }
   }
   if (nameMatches.length > 0) {
-    // Devolver la coincidencia MÁS LARGA (más específica)
     return nameMatches.sort((a, b) => b.len - a.len)[0].svc;
   }
 
-  // 2) Si no hay match por nombre, buscar por alias — también el más largo
   let best: typeof catalog[0] | null = null;
   let bestLen = 0;
   for (const s of catalog) {
@@ -110,20 +104,66 @@ function detectBarber(text: string, barbers: { id: number; name: string }[]) {
   return null;
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  SERVICIO
-// ─────────────────────────────────────────────────────────────────
+/**
+ * Respuesta del workflow de n8n.
+ */
+interface AIResponse {
+  text: string;
+  action?: {
+    type: 'navigate';
+    path: string;
+    queryParams?: Record<string, number>;
+    label: string;
+  } | null;
+  toolUsed?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ChatbotService {
   private catalog = inject(ServiceCatalogService);
   private barbers = inject(BarberService);
+  private http    = inject(HttpClient);
 
+  // ───── Estado público ─────
   private nextId = 1;
   readonly messages = signal<ChatMessage[]>([]);
   readonly isTyping = signal<boolean>(false);
+
+  /** Modo actual: rule-based o AI (DeepSeek via n8n) */
+  readonly mode = signal<ChatMode>(this.loadMode());
+
+  /** URL del webhook de AI (separado del de notificaciones) */
+  readonly aiWebhookUrl = signal<string>(this.loadWebhookUrl());
+
+  /** Estado de la configuración AI */
+  readonly aiEnabled = computed(() => !!this.aiWebhookUrl() && this.mode() === 'ai');
+
   private state: ChatState = {};
 
-  // ───── API PÚBLICA ─────
+  // ───── Persistencia ─────
+  private loadMode(): ChatMode {
+    if (typeof localStorage === 'undefined') return 'rule-based';
+    return (localStorage.getItem('barberschedule.chatMode') as ChatMode) || 'rule-based';
+  }
+  private loadWebhookUrl(): string {
+    if (typeof localStorage === 'undefined') return '';
+    return localStorage.getItem('barberschedule.aiWebhook') || '';
+  }
+  private saveMode(): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('barberschedule.chatMode', this.mode());
+  }
+  private saveWebhookUrl(): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('barberschedule.aiWebhook', this.aiWebhookUrl());
+  }
+
+  configure(opts: { mode?: ChatMode; webhookUrl?: string }): void {
+    if (opts.mode !== undefined) { this.mode.set(opts.mode); this.saveMode(); }
+    if (opts.webhookUrl !== undefined) { this.aiWebhookUrl.set(opts.webhookUrl); this.saveWebhookUrl(); }
+  }
+
+  // ───── API pública ─────
   initConversation(): void {
     if (this.messages().length > 0) return;
     this.respondWithDelay(() => {
@@ -132,6 +172,9 @@ export class ChatbotService {
         'Puedo decirte sobre servicios, precios, horarios, ayudarte a agendar o ' +
         'recomendarte algo según lo que buscas. ¿En qué te ayudo?',
         ['Quiero agendar', 'Ver precios', 'Recomiéndame algo', 'Horarios disponibles'],
+        undefined,
+        undefined,
+        'rule-based',
       );
     });
   }
@@ -140,7 +183,13 @@ export class ChatbotService {
     const trimmed = input.trim();
     if (!trimmed) return;
     this.pushUser(trimmed);
-    this.respondWithDelay(() => this.handle(trimmed));
+
+    // Decidir qué handler usar
+    if (this.mode() === 'ai' && this.aiWebhookUrl()) {
+      this.handleAI(trimmed);
+    } else {
+      this.respondWithDelay(() => this.handle(trimmed), 400);
+    }
   }
 
   buildFormLink(serviceId?: number, barberId?: number) {
@@ -156,18 +205,105 @@ export class ChatbotService {
     this.initConversation();
   }
 
+  /**
+   * Helper: ejecuta una navegación desde una acción del AI.
+   * Lo expone el service para que el componente lo llame.
+   */
+  executeAction(action: AIResponse['action']): void {
+    if (!action || action.type !== 'navigate') return;
+    // Lo importamos lazy para no crear dependencia circular
+    import('@angular/router').then(({ Router }) => {
+      // Use the router via a global event or just delay
+      // Mejor: usamos location directamente
+      const url = action.path +
+        (action.queryParams
+          ? '?' + Object.entries(action.queryParams)
+              .map(([k, v]) => `${k}=${v}`).join('&')
+          : '');
+      window.location.href = url;
+    });
+  }
+
   // ─────────────────────────────────────────────────────────
-  //  ⭐ FIX PRINCIPAL: mapa de quick replies → handler
-  //  Cada chip que el bot sugiere tiene un handler dedicado
+  //  AI HANDLER (DeepSeek via n8n)
+  // ─────────────────────────────────────────────────────────
+  private async handleAI(input: string): Promise<void> {
+    this.isTyping.set(true);
+    try {
+      // Construir historial (últimos 10 mensajes en formato OpenAI)
+      const history = this.messages()
+        .filter((m) => m.id !== this.messages()[this.messages().length - 1]?.id) // excluir el que acabamos de pushear
+        .slice(-10)
+        .map((m) => ({
+          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.text,
+        }));
+
+      const response = await firstValueFrom(
+        this.http.post<AIResponse>(this.aiWebhookUrl(), {
+          message: input,
+          history,
+        })
+      );
+
+      // Si n8n devuelve error (404, 500, etc), el body puede no ser JSON
+      // válido y response puede ser null. Lo manejamos defensivamente.
+      if (!response || !response.text) {
+        console.warn('AI bot: respuesta vacía o sin campo "text". Response:', response);
+        throw new Error('Respuesta vacía del bot AI');
+      }
+
+      const text = response.text;
+      const action = response.action;
+
+      // Renderizar la respuesta con quick replies + acción
+      const quickReplies = action
+        ? [action.label, 'Otra pregunta']
+        : ['¿Algo más?', 'Reiniciar'];
+
+      const suggestedServiceId = action?.queryParams?.['service'];
+      const suggestedBarberId  = action?.queryParams?.['highlight'];
+
+      this.pushBot(
+        text,
+        quickReplies,
+        suggestedServiceId,
+        suggestedBarberId,
+        'ai',
+      );
+
+      // Si hay acción, ejecutar navegación después de 2.5s
+      if (action) {
+        setTimeout(() => this.executeAction(action), 2500);
+      }
+    } catch (e) {
+      console.error('Error llamando al bot AI:', e);
+      // Fallback al rule-based si falla
+      this.pushBot(
+        '⚠️ El bot AI no está disponible ahora. Te conecto con el modo básico.\n\n' +
+        '¿En qué te ayudo?',
+        ['Quiero agendar', 'Ver precios', 'Recomiéndame algo'],
+        undefined,
+        undefined,
+        'rule-based',
+      );
+      // Cambiar a modo rule-based para el resto de la conversación
+      this.mode.set('rule-based');
+      this.saveMode();
+    } finally {
+      this.isTyping.set(false);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  RULE-BASED HANDLER (el original)
   // ─────────────────────────────────────────────────────────
   private readonly quickReplyHandlers: Array<{ match: RegExp; handler: (input: string) => void }> = [
-    // ── NAVEGACIÓN ──
     { match: /^(ir al formulario|al formulario|vamos al form|ll[ée]vame al form|agendar ya|vamos a agendar|ir a agendar|empezar|comencemos|comenzar)$/i,
       handler: () => this.goToForm() },
     { match: /^(ir a citas|ver mis citas|ir a inicio|ir a barberos|ir a servicios|ir al inicio|ir a la barberia)$/i,
       handler: () => this.handleNavigation() },
 
-    // ── SELECCIÓN DE SERVICIO (chips) ──
     { match: /^(quiero agendar|agendar cita|s[ií] agendar|vamos|dale|perfecto|hacemos|sep[aá]ralo|ap[úu]ntalo)$/i,
       handler: () => this.goToForm() },
     { match: /^quiero (.+)$/i,
@@ -181,7 +317,6 @@ export class ChatbotService {
     { match: /^(s[ií] con [a-z]+|prefiero a [a-z]+|s[ií] con [a-z]+)$/i,
       handler: (input) => this.handleQuiereBarbero(input) },
 
-    // ── CHIPS DE HORARIOS ──
     { match: /^(huecos hoy|disponibilidad hoy|para hoy|agendar para hoy)$/i,
       handler: () => this.handleHoy() },
     { match: /^(ma[ñn]ana|para ma[ñn]ana|mejor ma[ñn]ana)$/i,
@@ -193,7 +328,6 @@ export class ChatbotService {
     { match: /^ver disponibilidad( general)?$/i,
       handler: () => this.handleDisponibilidad() },
 
-    // ── CHIPS DE SERVICIOS ──
     { match: /^ver (otros servicios|m[áa]s servicios|el resto)$/i,
       handler: () => this.handleListServices() },
     { match: /^ver todos los precios$/i,
@@ -211,7 +345,6 @@ export class ChatbotService {
     { match: /^recomiendame algo$/i,
       handler: () => this.recommendRandom() },
 
-    // ── CHIPS DE CABELLOS ──
     { match: /^(cabello corto|corto|pelo corto)$/i,
       handler: () => this.recommendByHair('corto') },
     { match: /^(cabello largo|largo|pelo largo)$/i,
@@ -221,17 +354,14 @@ export class ChatbotService {
     { match: /^(no s[ée],? sorpr[ée]ndeme|no se que|no tengo idea)$/i,
       handler: () => this.recommendRandom() },
 
-    // ── RESPUESTAS AFIRMATIVAS / NEGATIVAS ──
     { match: /^(s[ií]|s[ií]!|si!|s[ií]+|s[íi]?i+!|dale|va|ok|okay|perfecto|genial|porfa|por favor|me encanta|me gusta|hag[áa]moslo|hacemos|sep[áa]ralo|ap[úu]ntalo|confirmo|de acuerdo|exacto|claro|obvio)$/i,
       handler: () => this.handleAffirmative() },
     { match: /^(no|nop|nel|mejor no|no quiero|cambiar|no gracias|ninguno)$/i,
       handler: () => this.handleNegative() },
 
-    // ── DESPEDIDAS ──
     { match: /^(agendar antes de irme|antes de irme)$/i,
       handler: () => this.goToForm() },
 
-    // ── NAVEGACIÓN A CATS ──
     { match: /^(otra cosa|otra pregunta)$/i,
       handler: () => this.handleOtraPregunta() },
     { match: /^volver al inicio$/i,
@@ -255,18 +385,13 @@ export class ChatbotService {
     { match: /^seguir aqu[íi]$/i,
       handler: () => this.handleOtraPregunta() },
 
-    // ── ESTILO DE CABELLOS ──
     { match: /^calvo$/i,
       handler: () => this.recommendByHair('calvo') },
     { match: /^entresemana$/i,
       handler: () => this.recommendByHair('entresemana') },
   ];
 
-  // ─────────────────────────────────────────────────────────
-  //  NÚCLEO: handle() con 4 niveles de fallback
-  // ─────────────────────────────────────────────────────────
   private handle(input: string): void {
-    // 1) PRIMERO: intentar matchear como quick reply (súper específico)
     for (const qr of this.quickReplyHandlers) {
       if (qr.match.test(input)) {
         qr.handler(input);
@@ -278,7 +403,6 @@ export class ChatbotService {
     const catalog = this.catalog.services();
     const barbers = this.barbers.barbers();
 
-    // 2) Detección de servicio (con keywords de intención de compra)
     const intentCompra = ['quiero', 'deseo', 'me interesa', 'agendar', 'apartar', 'reservar', 'dar', 'ponme', 'sacame'];
     const svc = detectService(input, catalog);
     if (svc && intentCompra.some((w) => text.includes(w))) {
@@ -291,6 +415,8 @@ export class ChatbotService {
         `¿Lo agendamos? También puedes ver otros servicios o ir directo al formulario.`,
         ['Sí, agendar', 'Ver otros servicios', '¿Quién me atiende?'],
         svc.id,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -300,6 +426,8 @@ export class ChatbotService {
         `${svc.icon} **${svc.name}** — $${svc.price} (${svcDur(svc.duration)}).\n\n¿Lo agendamos?`,
         ['Sí, agendar', 'Ver todos los precios', 'Otro servicio'],
         svc.id,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -313,11 +441,12 @@ export class ChatbotService {
         `¿Lo agendamos?`,
         ['Sí, agendar', 'Ver otros servicios', 'Recomiéndame otro'],
         svc.id,
+        undefined,
+        'rule-based',
       );
       return;
     }
 
-    // 3) Detección de barbero
     const barber = detectBarber(input, barbers);
     if (barber && /con|para|quiero|atender|hacer|disponible/.test(text)) {
       this.state.lastBarberId = barber.id;
@@ -328,6 +457,7 @@ export class ChatbotService {
         ['Sí, ir al formulario', 'Ver todos los barberos', 'Ver servicios'],
         undefined,
         barber.id,
+        'rule-based',
       );
       return;
     }
@@ -337,17 +467,17 @@ export class ChatbotService {
         ['Ir al formulario', 'Ver barberos', 'Ver servicios'],
         undefined,
         barber.id,
+        'rule-based',
       );
       return;
     }
 
-    // 4) Intenciones generales (orden de prioridad)
     if (this.matchIntent(text, ['hola', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'que tal', 'que onda', 'hi', 'hello', 'hey', 'que hubo', 'como estas'])) {
       this.pushBot(pick([
         '¡Hola! ¿Cómo estás? Listo para tu próximo corte. ✂️',
         '¡Buenas! Qué gusto saludarte. ¿En qué te ayudo?',
         '¡Hey! Bienvenido. ¿Quieres agendar, ver servicios o necesitas una recomendación?',
-      ]), ['Quiero agendar', 'Ver precios', 'Recomiéndame algo']);
+      ]), ['Quiero agendar', 'Ver precios', 'Recomiéndame algo'], undefined, undefined, 'rule-based');
       return;
     }
 
@@ -356,7 +486,7 @@ export class ChatbotService {
         '¡Hasta luego! Cualquier cosa, aquí ando 💈',
         '¡Nos vemos! Gracias por la charla. Que te quede increíble ese corte. ✂️',
         '¡Chao! Te espero cuando quieras reservar. 🤖',
-      ]), ['Agendar antes de irme', 'Ver servicios']);
+      ]), ['Agendar antes de irme', 'Ver servicios'], undefined, undefined, 'rule-based');
       return;
     }
 
@@ -366,6 +496,9 @@ export class ChatbotService {
         'Tenemos corte clásico, degradado, barba, corte+barba, tinte y diseños.\n\n' +
         'O dime qué tienes en mente y te ayudo a elegir.',
         catalog.map((s) => `${s.icon} ${s.name}`),
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -380,6 +513,9 @@ export class ChatbotService {
         catalog.map((s) => `${s.icon} ${s.name}: ${svcDur(s.duration)}`).join('\n') +
         `\n\n¿Cuál te interesa?`,
         catalog.map((s) => s.name),
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -424,6 +560,9 @@ export class ChatbotService {
         'Para cancelar o modificar una cita, ve a **Citas** en el menú, busca la tuya y usa el botón "Cancelar".\n\n' +
         '¿Quieres que te lleve?',
         ['Ir a Citas', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -432,6 +571,9 @@ export class ChatbotService {
       this.pushBot(
         'Para cambiar fecha u hora, ve a **Citas** y usa el botón "Editar" en la card correspondiente.',
         ['Ir a Citas', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -440,6 +582,9 @@ export class ChatbotService {
       this.pushBot(
         'En la página **Citas** puedes ver, filtrar y editar todas tus reservas. ¿Te llevo?',
         ['Ir a Citas', 'Crear una nueva'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -450,6 +595,9 @@ export class ChatbotService {
         'Aceptamos efectivo, tarjeta de débito/crédito y transferencia.\n\n' +
         'El pago se realiza al finalizar el servicio en la barbería.',
         ['Ir a agendar', 'Ver precios'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -459,6 +607,9 @@ export class ChatbotService {
         '📍 Estamos en el centro de la ciudad. La dirección exacta te la mandamos por WhatsApp al confirmar tu cita.\n\n' +
         '¿Quieres agendar y te la enviamos?',
         ['Sí, agendar', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -469,6 +620,9 @@ export class ChatbotService {
         'WhatsApp: +52 555 010 1010\n' +
         'Email: hola@barberschedule.app',
         ['Seguir aquí', 'Ver servicios'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -481,6 +635,9 @@ export class ChatbotService {
         '3️⃣ Confirma tus datos de contacto\n' +
         '4️⃣ ¡Listo!',
         ['Ir a agendar', 'Ver servicios'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -496,6 +653,8 @@ export class ChatbotService {
         '¿Lo agendamos?',
         ['Sí, agendar combo', 'Ver opciones', 'Otra recomendación'],
         this.catalog.services().find((s) => s.name === 'Corte + barba')?.id,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -505,6 +664,9 @@ export class ChatbotService {
         '⚡ Para algo rápido, el **Corte clásico** (30 min, $120) o solo **Barba** (30 min, $100) son los más ágiles. ' +
         '¿Cuál prefieres?',
         ['Corte clásico', 'Solo barba', 'Combo completo'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -514,7 +676,7 @@ export class ChatbotService {
         '¡De nada! Aquí ando cuando necesites. 💈',
         '¡Un placer! Cualquier otra duda, pregunta sin pena.',
         '¡Para eso estamos!',
-      ]), ['Agendar ahora', 'Ver servicios']);
+      ]), ['Agendar ahora', 'Ver servicios'], undefined, undefined, 'rule-based');
       return;
     }
 
@@ -523,6 +685,9 @@ export class ChatbotService {
         '😬 Soy un bot con reglas, no me ofendo pero no me ayudas. ' +
         '¿Quieres que te ayude a agendar o ver precios?',
         ['Ver precios', 'Agendar cita'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -532,6 +697,9 @@ export class ChatbotService {
         '🤖 Soy **BarberBot**, un asistente virtual con reglas. No soy IA real, ' +
         'estoy entrenado para ayudarte con la barbería. ¿En qué te ayudo?',
         ['Agendar cita', 'Ver servicios'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -540,6 +708,9 @@ export class ChatbotService {
       this.pushBot(
         '¡Genial! Si quieres ver, editar o cancelar, ve a **Citas**. ¿Te llevo?',
         ['Ir a Citas', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -548,6 +719,9 @@ export class ChatbotService {
       this.pushBot(
         '📱 Síguenos como **@BarberSchedule**. ¿Necesitas algo más?',
         ['Ver servicios', 'Agendar'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
@@ -557,11 +731,13 @@ export class ChatbotService {
         'Buena pregunta, pero ese tema se me escapa. Te puedo ayudar con: agendar, precios, servicios, horarios, equipo o recomendaciones.\n\n' +
         '¿Cuál te interesa?',
         ['Precios', 'Horarios', 'Agendar', 'Recomendación'],
+        undefined,
+        undefined,
+        'rule-based',
       );
       return;
     }
 
-    // Fallback final
     this.pushBot(
       '🤔 No te cacho. Puedo ayudarte con:\n\n' +
       '• Agendar una cita\n' +
@@ -571,10 +747,12 @@ export class ChatbotService {
       '• Decirte cómo funciona la app\n\n' +
       '¿Por dónde le entramos?',
       ['Agendar cita', 'Ver precios', 'Conocer al equipo', 'Recomiéndame algo'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
-  // ───── HANDLERS ESPECÍFICOS ─────
   private goToForm(): void {
     if (this.state.lastServiceId || this.state.lastBarberId) {
       this.pushBot(
@@ -582,23 +760,25 @@ export class ChatbotService {
         ['Otra recomendación', 'Ver servicios'],
         this.state.lastServiceId,
         this.state.lastBarberId,
+        'rule-based',
       );
     } else {
       this.pushBot(
         '¡Va! Elige primero un servicio para que te lo deje listo. ' +
         'Estos son los disponibles:',
         this.catalog.services().map((s) => `${s.icon} ${s.name}`),
+        undefined,
+        undefined,
+        'rule-based',
       );
     }
   }
 
   private handleQuieroServicio(input: string): void {
     const catalog = this.catalog.services();
-    // Extrae el servicio del texto "quiero X" o "agendar X"
     const m = input.match(/^(?:quiero|agendar)\s+(.+)$/i);
     if (!m) return;
     const query = norm(m[1]);
-    // Buscar por match exacto de nombre o por alias
     const svc = detectService(query, catalog);
     if (svc) {
       this.state.lastServiceId = svc.id;
@@ -607,11 +787,16 @@ export class ChatbotService {
         `¡Buena elección! ${svc.icon} **${svc.name}** dura ${svc.duration} min y cuesta $${svc.price}. ¿Lo agendamos?`,
         ['Sí, agendar', 'Ver otros servicios', 'Recomiéndame otro'],
         svc.id,
+        undefined,
+        'rule-based',
       );
     } else {
       this.pushBot(
         `No identifiqué "${m[1]}" como un servicio. Estos son los que tenemos:`,
         catalog.map((s) => `${s.icon} ${s.name}`),
+        undefined,
+        undefined,
+        'rule-based',
       );
     }
   }
@@ -630,6 +815,7 @@ export class ChatbotService {
         ['Otra recomendación', 'Ver servicios'],
         this.state.lastServiceId,
         b.id,
+        'rule-based',
       );
     } else {
       this.handleListBarbers();
@@ -645,6 +831,9 @@ export class ChatbotService {
       '• **Inicio** — dashboard\n\n' +
       '¿A cuál vamos?',
       ['Ir a Citas', 'Ver servicios', 'Ver barberos', 'Ir a inicio'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -656,6 +845,9 @@ export class ChatbotService {
       '🚫 Domingo: cerrado\n\n' +
       '¿Quieres que te muestre los huecos disponibles?',
       ['Huecos hoy', 'Mañana', 'Sábado', 'La próxima semana'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -664,6 +856,9 @@ export class ChatbotService {
       '¿Para hoy? Lo más rápido es ir al formulario y elegir horario. ' +
       'Los huecos ocupados se tachan automáticamente.',
       ['Ir al formulario', 'Mejor mañana', 'Ver disponibilidad general'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -671,6 +866,9 @@ export class ChatbotService {
     this.pushBot(
       'Mañana es buena opción. Te llevo al formulario donde puedes elegir el día y la hora exactos.',
       ['Ir al formulario', 'Ver horarios primero', 'Mejor otro día'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -679,6 +877,9 @@ export class ChatbotService {
       '🗓️ Trabajamos el **sábado de 10:00 a 18:00**. Los domingos descansamos. ' +
       '¿Te llevo al formulario?',
       ['Ir al formulario', 'Ver servicios', 'Mejor lunes'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -687,6 +888,9 @@ export class ChatbotService {
       'La próxima semana tenemos huecos de lunes a sábado. ' +
       'Ve al formulario y elige el día que prefieras.',
       ['Ir al formulario', 'Ver servicios', 'Mejor otro día'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -696,6 +900,9 @@ export class ChatbotService {
       'los slots ya ocupados aparecen tachados.\n\n' +
       '¿Vamos al formulario?',
       ['Ir al formulario', 'Ver servicios', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -706,6 +913,9 @@ export class ChatbotService {
       catalog.map((s) => `${s.icon} ${s.name} — $${s.price} · ${svcDur(s.duration)}`).join('\n') +
       '\n\n¿Cuál te interesa?',
       catalog.map((s) => `Quiero ${s.name}`),
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -719,6 +929,9 @@ export class ChatbotService {
       '💰 Los más accesibles:\n\n' +
       cheapest.map((s) => `${s.icon} **${s.name}** — $${s.price} · ${svcDur(s.duration)}`).join('\n'),
       cheapest.map((s) => `Quiero ${s.name}`),
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -732,6 +945,9 @@ export class ChatbotService {
       .join('\n');
     this.pushBot(`Nuestro equipo:\n\n${list}\n\n¿Quiero agendar con alguno?`,
       this.barbers.barbers().map((b) => `Sí, con ${b.name.split(' ')[0]}`),
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -745,6 +961,7 @@ export class ChatbotService {
       ['Sí, con él', 'Ver barberos', 'Otra recomendación'],
       undefined,
       top.id,
+      'rule-based',
     );
   }
 
@@ -774,6 +991,8 @@ export class ChatbotService {
       `Dura ${svc.duration} min y cuesta $${svc.price}. ¿Lo agendamos?`,
       ['Sí, agendar', 'Otra recomendación', 'Ver precios'],
       svc.id,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -786,6 +1005,8 @@ export class ChatbotService {
       '¿Lo agendamos?',
       ['Sí, agendar', 'Ver más baratos', 'Otra recomendación'],
       top.id,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -811,6 +1032,8 @@ export class ChatbotService {
       '¿Lo agendamos?',
       ['Sí, agendar', 'Otra recomendación', 'Ver servicios'],
       svc.id,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -821,6 +1044,7 @@ export class ChatbotService {
         ['Otra recomendación', 'Ver servicios'],
         this.state.lastServiceId,
         this.state.lastBarberId,
+        'rule-based',
       );
     } else if (this.state.lastBarberId) {
       this.pushBot(
@@ -828,9 +1052,10 @@ export class ChatbotService {
         ['Otra recomendación', 'Ver servicios'],
         undefined,
         this.state.lastBarberId,
+        'rule-based',
       );
     } else {
-      this.pushBot('¿Qué quieres hacer?', ['Agendar cita', 'Ver precios', 'Recomiéndame algo']);
+      this.pushBot('¿Qué quieres hacer?', ['Agendar cita', 'Ver precios', 'Recomiéndame algo'], undefined, undefined, 'rule-based');
     }
   }
 
@@ -838,6 +1063,9 @@ export class ChatbotService {
     this.pushBot(
       'No hay drama. ¿Qué te gustaría ver en su lugar?',
       ['Ver todos los servicios', 'Ver otros barberos', 'Recomiéndame algo'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -845,6 +1073,9 @@ export class ChatbotService {
     this.pushBot(
       '¿En qué más te ayudo?',
       ['Agendar cita', 'Ver precios', 'Horarios', 'Recomiéndame algo'],
+      undefined,
+      undefined,
+      'rule-based',
     );
   }
 
@@ -852,7 +1083,6 @@ export class ChatbotService {
     this.handleOtraPregunta();
   }
 
-  // ───── HELPERS ─────
   private matchIntent(text: string, keywords: string[]): boolean {
     return keywords.some((k) => text.includes(norm(k)));
   }
@@ -877,6 +1107,7 @@ export class ChatbotService {
     quickReplies?: string[],
     suggestedServiceId?: number,
     suggestedBarberId?: number,
+    source: 'rule-based' | 'ai' = 'rule-based',
   ) {
     this.messages.update((m) => [
       ...m,
@@ -887,6 +1118,7 @@ export class ChatbotService {
         quickReplies,
         suggestedServiceId,
         suggestedBarberId,
+        source,
         timestamp: new Date(),
       },
     ]);

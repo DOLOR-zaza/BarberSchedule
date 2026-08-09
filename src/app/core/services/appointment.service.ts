@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Appointment, AppointmentDraft, AppointmentStatus } from '../models';
+import { N8nService } from './n8n.service';
 
 const API_URL = 'http://127.0.0.1:3001/appointments';
 
@@ -16,6 +17,7 @@ const API_URL = 'http://127.0.0.1:3001/appointments';
 @Injectable({ providedIn: 'root' })
 export class AppointmentService {
   private http = inject(HttpClient);
+  private n8n  = inject(N8nService);
 
   /** Fuente de verdad reactiva. */
   private readonly _appointments = signal<Appointment[]>([]);
@@ -66,6 +68,8 @@ export class AppointmentService {
         this.http.post<Appointment>(API_URL, draft),
       );
       this._appointments.update((list) => [...list, created]);
+      // Notificación vía n8n (fire-and-forget, no bloquea).
+      this.n8n.notify('created', created, { triggeredBy: 'client' });
       return created;
     } catch (e) {
       this.error.set('No se pudo crear la cita.');
@@ -75,10 +79,10 @@ export class AppointmentService {
   }
 
   async update(id: number, patch: Partial<AppointmentDraft>): Promise<Appointment | null> {
+    const previous = this._appointments().find((a) => a.id === id);
     if (patch.barberId || patch.date || patch.time) {
-      const current = this._appointments().find((a) => a.id === id);
-      if (!current) return null;
-      const merged = { ...current, ...patch } as AppointmentDraft;
+      if (!previous) return null;
+      const merged = { ...previous, ...patch } as AppointmentDraft;
       if (this.hasConflict(merged, id)) {
         this.error.set('Ese barbero ya tiene una cita en ese horario.');
         return null;
@@ -89,6 +93,15 @@ export class AppointmentService {
         this.http.patch<Appointment>(`${API_URL}/${id}`, patch),
       );
       this._appointments.update((list) => list.map((a) => (a.id === id ? updated : a)));
+      const event =
+        updated.status === 'confirmada' ? 'confirmed' :
+        updated.status === 'atendida'   ? 'attended'   :
+        updated.status === 'cancelada'  ? 'cancelled'  :
+        'updated';
+      this.n8n.notify(event, updated, {
+        triggeredBy: 'admin',
+        previousStatus: previous?.status,
+      });
       return updated;
     } catch (e) {
       this.error.set('No se pudo actualizar la cita.');
@@ -103,8 +116,11 @@ export class AppointmentService {
 
   async remove(id: number): Promise<void> {
     try {
+      // Capturamos la cita antes de borrar para poder notificar.
+      const removed = this._appointments().find((a) => a.id === id);
       await firstValueFrom(this.http.delete(`${API_URL}/${id}`));
       this._appointments.update((list) => list.filter((a) => a.id !== id));
+      if (removed) this.n8n.notify('deleted', removed, { triggeredBy: 'admin' });
     } catch (e) {
       this.error.set('No se pudo eliminar la cita.');
       console.error(e);

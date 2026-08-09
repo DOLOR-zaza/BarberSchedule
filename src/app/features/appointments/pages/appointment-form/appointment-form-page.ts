@@ -57,6 +57,7 @@ export class AppointmentFormPage {
     time:       ['',                     Validators.required],
     clientName: ['',                     [Validators.required, Validators.minLength(2)]],
     phone:      ['',                     [Validators.required, Validators.pattern(/^[\d\s\-()+]+$/)]],
+    email:      ['',                     [Validators.required, Validators.email]],
     notes:      [''],
   });
 
@@ -149,6 +150,7 @@ export class AppointmentFormPage {
       time:       a.time,
       clientName: a.clientName,
       phone:      a.phone,
+      email:      a.email,
       notes:      a.notes,
     });
   }

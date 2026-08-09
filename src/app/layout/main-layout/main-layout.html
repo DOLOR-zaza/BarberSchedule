@@ -92,13 +92,24 @@
 
 <!-- Footer simple -->
 <footer class="border-t border-white/5 py-8 mt-20">
-  <div class="max-w-7xl mx-auto px-4 text-center text-ink-500 text-sm">
-    <p>
+  <div class="max-w-7xl mx-auto px-4 flex items-center justify-between text-ink-500 text-sm">
+    <p class="flex-1 text-center">
       <span class="text-brand-400">💈 BarberSchedule</span> ·
       Hecho con Angular 21 + Tailwind v4 · {{ 2026 }}
     </p>
+    <!-- Entrada oculta al panel de gestión (admin/staff).
+         Está en el footer para no ser obvia al cliente casual. -->
+    <a
+      routerLink="/gestion"
+      aria-label="Acceso interno"
+      title="Acceso interno"
+      class="opacity-30 hover:opacity-100 transition-opacity text-base px-2"
+    >⚙</a>
   </div>
 </footer>
 
 <!-- Error boundary global -->
 <app-error-boundary />
+
+<!-- PWA install prompt -->
+<app-install-prompt />

@@ -5,40 +5,50 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import {
-  Appointment,
   AppointmentStatus,
   APPOINTMENT_STATUSES,
   STATUS_LABELS,
 } from '../../../../core/models';
 import { AppointmentService } from '../../../../core/services';
 import { AppointmentCard } from '../../components/appointment-card/appointment-card';
-import { ConfirmModal } from '../../../../shared/components/confirm-modal/confirm-modal';
 
 type Filter = 'todas' | AppointmentStatus;
 
+/**
+ * Vista pública de citas — solo LECTURA para el cliente.
+ *
+ * Esta vista es informativa. No se permite ninguna acción sobre
+ * las citas existentes porque en este modelo no hay auth, y
+ * cualquiera podría modificar citas ajenas.
+ *
+ * El cliente puede:
+ *   - Ver el listado completo
+ *   - Filtrar por estado
+ *   - Buscar por nombre o teléfono
+ *
+ * Las acciones (confirmar, cancelar, atender, eliminar, editar)
+ * viven exclusivamente en `/gestion` (panel admin).
+ *
+ * Si el cliente quiere gestionar su cita, debe llamar a la
+ * barbería o usar el chatbot para recibir instrucciones.
+ */
 @Component({
   selector: 'app-appointment-list-page',
-  imports: [RouterLink, AppointmentCard, ConfirmModal],
+  imports: [RouterLink, AppointmentCard],
   templateUrl: './appointment-list-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppointmentListPage {
   private apptService = inject(AppointmentService);
-  private router      = inject(Router);
 
-  // --- Estado local con signals ---
   protected readonly filter = signal<Filter>('todas');
   protected readonly search = signal<string>('');
   protected readonly debouncedSearch = signal<string>('');
-  protected readonly showDeleteModal  = signal<boolean>(false);
-  protected readonly pendingDeleteId  = signal<number | null>(null);
 
-  // Debounce manual (sin rxjs para mantener el ejemplo limpio)
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Selectores derivados ---
   protected readonly appointments = this.apptService.appointments;
   protected readonly loading      = this.apptService.loading;
   protected readonly counts       = this.apptService.countsByStatus;
@@ -66,7 +76,6 @@ export class AppointmentListPage {
       .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   });
 
-  // --- Handlers ---
   protected onSearchInput(value: string): void {
     this.search.set(value);
     if (this.debounceHandle) clearTimeout(this.debounceHandle);
@@ -79,43 +88,10 @@ export class AppointmentListPage {
     this.filter.set(f);
   }
 
-  // --- Acciones del AppointmentCard ---
-  protected onEdit(appt: Appointment): void {
-    this.router.navigate(['/citas/editar', appt.id]);
-  }
-
-  protected onDelete(id: number): void {
-    this.pendingDeleteId.set(id);
-    this.showDeleteModal.set(true);
-  }
-
-  protected async onConfirmDelete(): Promise<void> {
-    const id = this.pendingDeleteId();
-    if (id == null) return;
-    await this.apptService.remove(id);
-    this.showDeleteModal.set(false);
-    this.pendingDeleteId.set(null);
-  }
-
-  protected onCancelDelete(): void {
-    this.showDeleteModal.set(false);
-    this.pendingDeleteId.set(null);
-  }
-
-  protected async onConfirm(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'confirmada');
-  }
-  protected async onAttend(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'atendida');
-  }
-  protected async onCancel(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'cancelada');
-  }
-
   protected statusLabel(s: Filter): string {
     return s === 'todas' ? 'Todas' : STATUS_LABELS[s as AppointmentStatus];
   }
 
-  // Para el template
   protected readonly ALL_STATUSES = APPOINTMENT_STATUSES;
 }
+

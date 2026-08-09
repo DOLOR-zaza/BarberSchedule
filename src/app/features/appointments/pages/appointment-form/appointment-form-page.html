@@ -189,6 +189,21 @@
         </label>
 
         <label class="block">
+          <span class="text-sm font-medium text-ink-200 mb-1.5 block">Email *</span>
+          <input
+            type="email"
+            formControlName="email"
+            placeholder="tucorreo@ejemplo.com"
+            autocomplete="email"
+            class="w-full px-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all"
+          />
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <span class="text-xs text-rose-300 mt-1 block">Ingresa un email válido (ej: tucorreo@ejemplo.com).</span>
+          }
+          <span class="text-[11px] text-ink-500 mt-1 block">Lo usamos para enviarte la confirmación de la cita.</span>
+        </label>
+
+        <label class="block">
           <span class="text-sm font-medium text-ink-200 mb-1.5 block">Notas (opcional)</span>
           <textarea
             formControlName="notes"

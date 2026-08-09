@@ -65,6 +65,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/home/about-page').then((m) => m.AboutPage),
       },
+      {
+        path: 'gestion',
+        title: 'Gestión · BarberSchedule',
+        loadComponent: () =>
+          import('./features/admin/pages/gestion/gestion-page')
+            .then((m) => m.GestionPage),
+      },
     ],
   },
   { path: '**', redirectTo: 'inicio' },

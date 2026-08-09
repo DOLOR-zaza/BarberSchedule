@@ -1,0 +1,107 @@
+{
+  "name": "BarberSchedule - Chatbot AI v2 (HTTP Request)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "barberschedule-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook (Chat)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "REEMPLAZA-CON-TU-ID"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Construye el payload de DeepSeek con system prompt + historia\nconst input = $input.first().json.body || $input.first().json;\nconst userMessage = (input.message || '').toString().slice(0, 1000);\nconst history = Array.isArray(input.history) ? input.history.slice(-10) : [];\n\nconst SYSTEM_PROMPT = `Eres BarberBot, el asistente virtual oficial de la barbería **BarberSchedule**. Tu objetivo es ayudar a los clientes a agendar citas, conocer servicios, y resolver dudas sobre la barbería.\n\n# TONO Y ESTILO\n- Habla en **español mexicano casual** pero profesional. Tutea al usuario.\n- Sé **breve y amigable**. Mensajes de 2-4 oraciones máximo.\n- Usa **1-2 emojis** por mensaje, no más.\n- Si el usuario escribe en **inglés u otro idioma**, responde en ese mismo idioma.\n\n# CATÁLOGO DE SERVICIOS\n- **Corte clásico** (id=1) — 30 min — $120\n- **Corte degradado** (id=2) — 30 min — $150\n- **Barba** (id=3) — 30 min — $100\n- **Corte + barba** (id=4) — 45 min — $230\n- **Tinte** (id=5) — 60 min — $350\n- **Diseño** (id=6) — 45 min — $200\n\n# EQUIPO DE BARBEROS\n- **Carlos Ruiz** (id=1) — Clásico, 5 años\n- **Miguel Ángel** (id=2) — Degradados, 7 años\n- **Luis Hernández** (id=3) — Diseños, 3 años\n\n# HORARIOS\n- Lun a Vie: 10:00 — 20:00\n- Sábado: 10:00 — 18:00\n- Domingo: cerrado\n\n# UBICACIÓN Y CONTACTO\n- WhatsApp: +52 555 010 1010\n- Email: hola@barberschedule.app\n- Pagos: efectivo, tarjeta, transferencia\n\n# LO QUE PUEDES HACER\n1. Responder sobre servicios, precios, barberos, horarios, contacto\n2. Recomendar servicios según lo que el usuario busca\n3. Comparar opciones (ej: \"¿qué diferencia hay entre fade bajo y medio?\")\n4. Ayudar a agendar (cuando el usuario quiera)\n5. Detectar frustración y sugerir contacto humano\n\n# LO QUE NO DEBES HACER\n- No inventes precios o servicios\n- No prometas descuentos no autorizados\n- No des opiniones médicas o legales\n- No hables de temas fuera de la barbería\n\n# FORMATO DE RESPUESTAS\n- Texto plano, sin markdown complejo\n- No uses ** para negritas dentro de tus respuestas\n- Si listas servicios, sepáralos con saltos de línea\n\n# FRASES ÚTILES PARA MEXICANOS\n- \"¡Qué onda!\", \"¡Hola! ¿Cómo te echamos la mano?\"\n- \"Con gusto te ayudo\"\n- \"¿Algo más en lo que te pueda ayudar?\"\n- \"¡Nos vemos pronto! 💈\"\n`;\n\nconst messages = [\n  { role: 'system', content: SYSTEM_PROMPT },\n  ...history,\n  { role: 'user', content: userMessage }\n];\n\nreturn {\n  json: {\n    model: 'deepseek-chat',\n    messages,\n    temperature: 0.7,\n    max_tokens: 500,\n    stream: false\n  }\n};"
+      },
+      "id": "format",
+      "name": "Format Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sk-3cfb5bea64b64664ace86f43b4138080"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "deepseek",
+      "name": "DeepSeek HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extrae el texto de la respuesta de DeepSeek\nconst response = $input.first().json;\nconst choice = response.choices?.[0];\nconst text = choice?.message?.content || 'Lo siento, no pude procesar tu mensaje.';\n\nreturn {\n  json: {\n    text,\n    action: null,\n    usage: response.usage\n  }\n};"
+      },
+      "id": "process",
+      "name": "Extract Text",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond to Frontend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (Chat)": {
+      "main": [[{"node": "Format Request", "type": "main", "index": 0}]]
+    },
+    "Format Request": {
+      "main": [[{"node": "DeepSeek HTTP", "type": "main", "index": 0}]]
+    },
+    "DeepSeek HTTP": {
+      "main": [[{"node": "Extract Text", "type": "main", "index": 0}]]
+    },
+    "Extract Text": {
+      "main": [[{"node": "Respond to Frontend", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [{"name": "barberschedule"}, {"name": "ai-chatbot-v2"}],
+  "active": false,
+  "pinData": {}
+}
