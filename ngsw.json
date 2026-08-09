@@ -1,0 +1,128 @@
+{
+  "configVersion": 1,
+  "timestamp": 1786317888432,
+  "index": "/BarberSchedule/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [
+        "/BarberSchedule/chunk-24IJTTK7.js",
+        "/BarberSchedule/chunk-2RNX2OL2.js",
+        "/BarberSchedule/chunk-2WHGQ7V2.js",
+        "/BarberSchedule/chunk-6EWXHNMY.js",
+        "/BarberSchedule/chunk-7G753HG3.js",
+        "/BarberSchedule/chunk-CX5CNTBL.js",
+        "/BarberSchedule/chunk-D4RPQKFD.js",
+        "/BarberSchedule/chunk-DRGVKO45.js",
+        "/BarberSchedule/chunk-E42EUSUX.js",
+        "/BarberSchedule/chunk-E5DSBZZD.js",
+        "/BarberSchedule/chunk-FD6AB36P.js",
+        "/BarberSchedule/chunk-FGXMIVW4.js",
+        "/BarberSchedule/chunk-FQRBBJV7.js",
+        "/BarberSchedule/chunk-ITLHD6B5.js",
+        "/BarberSchedule/chunk-QIEN6AGN.js",
+        "/BarberSchedule/chunk-ULNFXW2Z.js",
+        "/BarberSchedule/chunk-V3CI57U7.js",
+        "/BarberSchedule/chunk-VPT5JCYN.js",
+        "/BarberSchedule/chunk-Y4WW25X7.js",
+        "/BarberSchedule/favicon.ico",
+        "/BarberSchedule/index.html",
+        "/BarberSchedule/main-FPZ2A7TW.js",
+        "/BarberSchedule/manifest.webmanifest",
+        "/BarberSchedule/styles-B4NUXYW5.css"
+      ],
+      "patterns": []
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "urls": [],
+      "patterns": []
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "json-server-api",
+      "patterns": [
+        "http:\\/\\/127\\.0\\.0\\.1:3001\\/.*",
+        "http:\\/\\/localhost:3001\\/.*"
+      ],
+      "strategy": "freshness",
+      "maxSize": 100,
+      "maxAge": 3600000,
+      "timeoutMs": 5000,
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "version": 1
+    },
+    {
+      "name": "fonts",
+      "patterns": [
+        "https:\\/\\/fonts\\.googleapis\\.com\\/.*",
+        "https:\\/\\/fonts\\.gstatic\\.com\\/.*"
+      ],
+      "strategy": "performance",
+      "maxSize": 30,
+      "maxAge": 2592000000,
+      "cacheQueryOptions": {
+        "ignoreVary": true
+      },
+      "version": 1
+    }
+  ],
+  "hashTable": {
+    "/BarberSchedule/chunk-24IJTTK7.js": "38d9a0ae8bc7274506c336ec18e3a4c8fb8746b2",
+    "/BarberSchedule/chunk-2RNX2OL2.js": "d2728cd39777eaedd5d5c127d097261cc2541f1c",
+    "/BarberSchedule/chunk-2WHGQ7V2.js": "8678081e534f1e391d1860bfabec231fb5bd9d84",
+    "/BarberSchedule/chunk-6EWXHNMY.js": "625cf875dc1f7fb7e2ddda0408d0e17ebfd9e18a",
+    "/BarberSchedule/chunk-7G753HG3.js": "c62b85acf821d4ce88053c17cbac02412c55c058",
+    "/BarberSchedule/chunk-CX5CNTBL.js": "27395ad630fe2e0d2595f13333919d1c8a326520",
+    "/BarberSchedule/chunk-D4RPQKFD.js": "b5956ecafed7b39c7b0f4c96038b6af3da62d45e",
+    "/BarberSchedule/chunk-DRGVKO45.js": "83f43232f57bbc7b961f3a49ea060c22bb72e5d6",
+    "/BarberSchedule/chunk-E42EUSUX.js": "af1f78cfbd3fd146e8cd50439c78a6d6e2f0e107",
+    "/BarberSchedule/chunk-E5DSBZZD.js": "02e663bb1a19bdc3bbb379c72352d33582360c26",
+    "/BarberSchedule/chunk-FD6AB36P.js": "377fc12d3c130dc287c1f4ab24faf55e1cb619bf",
+    "/BarberSchedule/chunk-FGXMIVW4.js": "ee9081443721925bc62eb342ee42faaeb8d2e763",
+    "/BarberSchedule/chunk-FQRBBJV7.js": "b58ff1fe2d245c1c69205c500f97547576cd81a3",
+    "/BarberSchedule/chunk-ITLHD6B5.js": "c9f9098c648b6b84e9b2549823d03c75a7225ae8",
+    "/BarberSchedule/chunk-QIEN6AGN.js": "65dccd929992615176eff1e758ad3c9825515c7e",
+    "/BarberSchedule/chunk-ULNFXW2Z.js": "97de1259ec27ffc91c619409ec09e7d7e30b6e07",
+    "/BarberSchedule/chunk-V3CI57U7.js": "3ae91aa9016066644de406d4ee04039927053edb",
+    "/BarberSchedule/chunk-VPT5JCYN.js": "1a8ba55b28a81df5494316339c7e83696200541a",
+    "/BarberSchedule/chunk-Y4WW25X7.js": "3ce48ce639c1d4472f6ee717e95ae1036d5900a0",
+    "/BarberSchedule/favicon.ico": "9c39f434fe1261f68c5e3eefdf734630d99c5670",
+    "/BarberSchedule/index.html": "1ba1f47caffeb7ed5bec1cd950f8216b847fd8a7",
+    "/BarberSchedule/main-FPZ2A7TW.js": "1d742f68a2f91c16c551aa8fd537178f3aee50f2",
+    "/BarberSchedule/manifest.webmanifest": "988ecbb59e080c0cdb69814978acff0dece206ea",
+    "/BarberSchedule/styles-B4NUXYW5.css": "e6821d15ab24d87a063af2bf9029a5398926d59e"
+  },
+  "navigationUrls": [
+    {
+      "positive": true,
+      "regex": "^\\/.*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*\\.[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*$"
+    },
+    {
+      "positive": false,
+      "regex": "^\\/(?:.+\\/)?[^/]*__[^/]*\\/.*$"
+    }
+  ],
+  "navigationRequestStrategy": "performance"
+}
