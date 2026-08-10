@@ -17,6 +17,7 @@ import {
   BarberService,
   ServiceCatalogService,
 } from '../../../../core/services';
+import { environment } from '../../../../../environments/environment';
 
 type Step = 1 | 2 | 3;
 
@@ -103,9 +104,6 @@ export class AppointmentFormPage {
   });
 
   // Re-exports de los signals de disponibilidad del servicio.
-  // El template los consume directamente (no usa `appts.*` porque
-  // `appts` es private). Almacenan la misma referencia al signal
-  // del servicio, por lo que cualquier cambio se refleja en tiempo real.
   protected readonly availabilityLoading = this.appts.availabilityLoading;
   protected readonly availabilityError   = this.appts.availabilityError;
 
@@ -279,13 +277,25 @@ export class AppointmentFormPage {
         const updated = await this.appts.update(id, patch);
         if (!updated) throw new Error(this.appts.error() ?? 'No se pudo actualizar');
       } else {
-        const created = await this.appts.create({
+        const ok = await this.appts.create({
           ...v,
           serviceId: v.serviceId!,
           barberId:  v.barberId!,
           status:    'pendiente' as AppointmentStatus,
         });
-        if (!created) throw new Error(this.appts.error() ?? 'No se pudo crear');
+        if (!ok) throw new Error(this.appts.error() ?? 'No se pudo crear');
+        // Post-create: navegación depende del backend activo.
+        //   - dev (json-server): /citas muestra la cita recién creada
+        //   - prod (Supabase): /citas no puede leer appointments (loadAll
+        //     apunta a json-server que no existe). Vamos a /inicio
+        //     con query param para que home-page muestre un banner de
+        //     confirmación.
+        if (environment.useSupabase) {
+          this.router.navigate(['/inicio'], { queryParams: { booked: 'true' } });
+        } else {
+          this.router.navigate(['/citas']);
+        }
+        return; // evita el router.navigate(['/citas']) del finally implícito
       }
       this.router.navigate(['/citas']);
     } catch (e) {

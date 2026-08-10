@@ -13,8 +13,10 @@ const API_URL = 'http://127.0.0.1:3001/appointments';
  * y expone la lista como Signal para integración directa con
  * componentes standalone.
  *
- * Incluye la regla de negocio clave: validación de horario
- * ocupado para evitar doble reserva al mismo barbero.
+ * V24.1.3: `create()` ahora es dual (json-server / Supabase).
+ *   - Dev: comportamiento anterior con n8n.notify
+ *   - Prod: INSERT en Supabase sin .select() (no tenemos SELECT público),
+ *           no actualiza _appointments, no llama n8n.notify.
  */
 @Injectable({ providedIn: 'root' })
 export class AppointmentService {
@@ -35,9 +37,6 @@ export class AppointmentService {
    * `loadOccupiedSlots()` desde el RPC `get_occupied_slots`. En dev
    * la llena `loadAll()` desde json-server y `occupiedSlots()`
    * filtra del signal local.
-   *
-   * Mantenido como signal para que `occupiedSlots()` siga
-   * teniendo una interfaz síncrona para el componente.
    */
   readonly occupiedSlotsByBarberDate = signal<string[]>([]);
   readonly availabilityLoading = signal<boolean>(false);
@@ -75,10 +74,36 @@ export class AppointmentService {
     }
   }
 
-  async create(draft: AppointmentDraft): Promise<Appointment | null> {
+  /**
+   * Crea una cita. Dual:
+   *   - dev (json-server): hasConflict + POST + actualizar _appointments + n8n.notify
+   *   - prod (Supabase): INSERT sin .select() + manejo de 23505
+   *
+   * @returns true si la cita se creó, false si hubo error.
+   *          En caso de error, `this.error` contiene el mensaje
+   *          legible para mostrar en UI.
+   */
+  async create(draft: AppointmentDraft): Promise<boolean> {
+    // Limpiar errores anteriores antes de elegir backend.
+    this.error.set(null);
+    if (environment.useSupabase) {
+      return this.createInSupabase(draft);
+    }
+    return this.createInJsonServer(draft);
+  }
+
+  /**
+   * Camino dev: json-server.
+   * Conserva el comportamiento original:
+   *   - hasConflict (validación local)
+   *   - POST a json-server
+   *   - actualizar _appointments
+   *   - notificar a n8n
+   */
+  private async createInJsonServer(draft: AppointmentDraft): Promise<boolean> {
     if (this.hasConflict(draft)) {
       this.error.set('Ese barbero ya tiene una cita en ese horario.');
-      return null;
+      return false;
     }
     try {
       const created = await firstValueFrom(
@@ -87,11 +112,60 @@ export class AppointmentService {
       this._appointments.update((list) => [...list, created]);
       // Notificación vía n8n (fire-and-forget, no bloquea).
       this.n8n.notify('created', created, { triggeredBy: 'client' });
-      return created;
+      return true;
     } catch (e) {
       this.error.set('No se pudo crear la cita.');
       console.error(e);
-      return null;
+      return false;
+    }
+  }
+
+  /**
+   * Camino prod: Supabase.
+   * Limitaciones conocidas (resueltas en V25 con Supabase Auth):
+   *   - No hacemos hasConflict() porque _appointments está vacío
+   *     (json-server no existe en producción). La DB es la
+   *     barrera definitiva: el índice único parcial
+   *     `uniq_active_appointment` rechaza duplicados con 23505.
+   *   - No usamos .select() porque la policy pública NO permite
+   *     SELECT sobre appointments. Por lo tanto no recibimos el id
+   *     generado, lo que impide llamar a n8n.notify (requiere
+   *     Appointment con id). La notificación de email queda
+   *     pendiente para V25 (service_role en n8n).
+   *   - No actualizamos _appointments (json-server no existe).
+   *   - No actualizamos occupiedSlotsByBarberDate (el form
+   *     navega a otra ruta inmediatamente).
+   */
+  private async createInSupabase(draft: AppointmentDraft): Promise<boolean> {
+    try {
+      const { error } = await this.supabase.client
+        .from('appointments')
+        .insert({
+          client_name: draft.clientName,
+          phone:       draft.phone,
+          email:       draft.email,
+          service_id:  draft.serviceId,
+          barber_id:   draft.barberId,
+          date:        draft.date,
+          time:        draft.time,
+          // Forzar 'pendiente' en INSERT público; no confiar en el form.
+          status:      'pendiente',
+          notes:       draft.notes ?? '',
+        });
+      if (!error) return true;
+      // 23505 = unique_violation del índice uniq_active_appointment
+      if (error.code === '23505') {
+        this.error.set('Ese horario ya está ocupado. Elige otro horario.');
+        return false;
+      }
+      this.error.set('No se pudo crear la cita. Intenta nuevamente.');
+      console.error('Error creando cita en Supabase', error);
+      return false;
+    } catch (e) {
+      // Red caída, timeout, etc.
+      this.error.set('No se pudo crear la cita. Intenta nuevamente.');
+      console.error('Error creando cita en Supabase', e);
+      return false;
     }
   }
 
