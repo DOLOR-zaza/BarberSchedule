@@ -69,29 +69,56 @@ export class AppointmentFormPage {
   protected readonly timeSlots = generateTimeSlots(10, 20, 30);
 
   /**
-   * Signal reactivo que refleja el valor actual del form.
-   * Convierte form.valueChanges (Observable) en signal para que
-   * los `computed` de abajo se re-evalúen automáticamente.
+   * Signal reactiva que refleja el valor actual del form.
+   * Convierte form.valueChanges (Observable) en signal.
+   * Se usa SOLO para `canAdvance` (que necesita varios campos).
    */
   private readonly formValue = toSignal(
     this.form.valueChanges,
     { initialValue: this.form.getRawValue() }
   );
 
+  /**
+   * Signals reactivas para barberId y date, derivadas
+   * individualmente de los valueChanges. Permiten que el
+   * `computed` de occupiedSlots y el effect #5 reaccionen
+   * SOLO a cambios de estos dos campos (no a time, clientName,
+   * phone, email, notes, que también disparan valueChanges).
+   */
+  private readonly barberIdSignal = toSignal(
+    this.form.controls.barberId.valueChanges,
+    { initialValue: this.form.controls.barberId.value },
+  );
+  private readonly dateSignal = toSignal(
+    this.form.controls.date.valueChanges,
+    { initialValue: this.form.controls.date.value },
+  );
+
   // Slots ocupados para el barbero+fecha actual
   protected readonly occupiedSlots = computed(() => {
-    const b = this.form.controls.barberId.value;
-    const d = this.form.controls.date.value;
+    const b = this.barberIdSignal();
+    const d = this.dateSignal();
     if (!b || !d) return [] as string[];
     return this.appts.occupiedSlots(b, d);
   });
 
-  // Validación por paso — ahora reactivo gracias a formValue signal
+  // Re-exports de los signals de disponibilidad del servicio.
+  // El template los consume directamente (no usa `appts.*` porque
+  // `appts` es private). Almacenan la misma referencia al signal
+  // del servicio, por lo que cualquier cambio se refleja en tiempo real.
+  protected readonly availabilityLoading = this.appts.availabilityLoading;
+  protected readonly availabilityError   = this.appts.availabilityError;
+
+  // Validación por paso — usa formValue() (cubre varios campos)
   protected readonly canAdvance = computed<boolean>(() => {
     const v = this.formValue();
     switch (this.currentStep()) {
       case 1: return v.serviceId != null && v.serviceId !== undefined;
-      case 2: return v.barberId != null && !!v.date && !!v.time;
+      case 2: return v.barberId != null
+        && !!v.date
+        && !!v.time
+        && !this.appts.availabilityError()
+        && !this.appts.availabilityLoading();
       case 3: return this.form.valid;
       default: return false;
     }
@@ -140,6 +167,20 @@ export class AppointmentFormPage {
       const a = this.appts.appointments().find((x) => x.id === id);
       if (a) this.hydrate(a);
     });
+
+    // 5. Cuando cambien barbero/fecha, consultar disponibilidad.
+    //    Si ambos quedan vacíos, resetear estado.
+    //    Usa barberIdSignal/dateSignal (NO formValue) para no
+    //    re-disparar al cambiar time, clientName, phone, etc.
+    effect(() => {
+      const b = this.barberIdSignal();
+      const d = this.dateSignal();
+      if (b && d) {
+        void this.appts.loadOccupiedSlots(b, d);
+      } else {
+        this.appts.resetOccupiedSlots();
+      }
+    });
   }
 
   private hydrate(a: Appointment): void {
@@ -185,6 +226,20 @@ export class AppointmentFormPage {
   protected selectBarber(id: number): void {
     this.form.controls.barberId.setValue(id);
     this.form.controls.barberId.markAsTouched();
+    // El horario anterior ya no es necesariamente válido para el nuevo
+    // barbero. Resetear time y desmarcarlo como touched.
+    this.form.controls.time.setValue('');
+    this.form.controls.time.markAsUntouched();
+  }
+
+  /**
+   * Handler de cambio en el input de fecha. Resetea `time` porque
+   * el horario previamente elegido puede no estar disponible
+   * en la nueva fecha.
+   */
+  protected onDateChange(): void {
+    this.form.controls.time.setValue('');
+    this.form.controls.time.markAsUntouched();
   }
 
   protected selectTime(slot: string): void {

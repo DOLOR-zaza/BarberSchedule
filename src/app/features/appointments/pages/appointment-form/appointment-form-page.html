@@ -116,6 +116,7 @@
               type="date"
               formControlName="date"
               [min]="getDateMin()"
+              (change)="onDateChange()"
               class="w-full px-4 py-2.5 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 transition-all"
             />
           </label>
@@ -125,6 +126,12 @@
           <h3 class="text-sm font-medium text-ink-200 mb-3">⏰ Horario disponible</h3>
           @if (!form.controls.barberId.value || !form.controls.date.value) {
             <p class="text-ink-500 text-sm italic">Selecciona barbero y fecha para ver horarios.</p>
+          } @else if (availabilityLoading()) {
+            <p class="text-ink-500 text-sm italic">Consultando disponibilidad...</p>
+          } @else if (availabilityError()) {
+            <p class="text-rose-300 text-sm">
+              No se pudo consultar la disponibilidad.
+            </p>
           } @else {
             <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
               @for (slot of timeSlots; track slot) {

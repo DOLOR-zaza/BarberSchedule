@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Appointment, AppointmentDraft, AppointmentStatus } from '../models';
 import { N8nService } from './n8n.service';
+import { environment } from '../../../environments/environment';
+import { SupabaseService } from './supabase.service';
 
 const API_URL = 'http://127.0.0.1:3001/appointments';
 
@@ -18,14 +20,29 @@ const API_URL = 'http://127.0.0.1:3001/appointments';
 export class AppointmentService {
   private http = inject(HttpClient);
   private n8n  = inject(N8nService);
+  private supabase = inject(SupabaseService);
 
-  /** Fuente de verdad reactiva. */
+  /** Fuente de verdad reactiva (modo local). */
   private readonly _appointments = signal<Appointment[]>([]);
   readonly appointments = this._appointments.asReadonly();
 
   /** Estado de carga, útil para skeletons. */
   readonly loading = signal<boolean>(false);
   readonly error   = signal<string | null>(null);
+
+  /**
+   * Disponibilidad consultada. En producción (Supabase) la llena
+   * `loadOccupiedSlots()` desde el RPC `get_occupied_slots`. En dev
+   * la llena `loadAll()` desde json-server y `occupiedSlots()`
+   * filtra del signal local.
+   *
+   * Mantenido como signal para que `occupiedSlots()` siga
+   * teniendo una interfaz síncrona para el componente.
+   */
+  readonly occupiedSlotsByBarberDate = signal<string[]>([]);
+  readonly availabilityLoading = signal<boolean>(false);
+  readonly availabilityError   = signal<string | null>(null);
+  private _epoch = 0;
 
   // --- Selectores derivados (computed signals) ---
   readonly count = computed(() => this._appointments().length);
@@ -145,11 +162,76 @@ export class AppointmentService {
     });
   }
 
-  /** Devuelve los slots ya ocupados para un barbero+fecha. */
+  /**
+   * Devuelve los slots ya ocupados para un barbero+fecha.
+   *
+   * Modo dev (json-server): filtra del signal local `_appointments`.
+   * Modo prod (Supabase): lee del signal `occupiedSlotsByBarberDate`,
+   *   que se llena con `loadOccupiedSlots()` (vía RPC).
+   *
+   * El componente sigue recibiendo `string[]` síncrono.
+   */
   occupiedSlots(barberId: number, date: string): string[] {
+    if (environment.useSupabase) {
+      return this.occupiedSlotsByBarberDate();
+    }
     return this._appointments()
       .filter((a) => a.barberId === barberId && a.date === date && a.status !== 'cancelada')
       .map((a) => a.time);
+  }
+
+  /**
+   * Carga slots ocupados para un barbero+fecha desde el RPC
+   * `get_occupied_slots` de Supabase. En dev no hace nada.
+   *
+   * Fail-closed con epoch counter: si el usuario cambia barbero/fecha
+   * mientras hay una RPC en vuelo, las respuestas viejas se descartan
+   * y solo la última llamada actualiza el signal.
+   */
+  async loadOccupiedSlots(barberId: number, date: string): Promise<void> {
+    if (!environment.useSupabase) return;
+    const myEpoch = ++this._epoch;
+    // Limpiar slots anteriores inmediatamente (evita parpadeo).
+    this.occupiedSlotsByBarberDate.set([]);
+    this.availabilityLoading.set(true);
+    this.availabilityError.set(null);
+    try {
+      const { data, error } = await this.supabase.client
+        .rpc('get_occupied_slots', {
+          p_barber_id: barberId,
+          p_date: date,
+        });
+      // Si llegó una llamada más reciente, descartar esta respuesta.
+      if (myEpoch !== this._epoch) return;
+      if (error) throw error;
+      // Normalizar HH:mm:ss → HH:mm
+      const slots = (data ?? [])
+        .map((row: { time_slot: string }) => row.time_slot)
+        .map((t: string) => t.slice(0, 5));
+      this.occupiedSlotsByBarberDate.set(slots);
+    } catch (e) {
+      if (myEpoch !== this._epoch) return;
+      // Detalles internos solo en consola; UI muestra mensaje genérico.
+      console.error('Error consultando disponibilidad', e);
+      this.availabilityError.set('No se pudo consultar la disponibilidad');
+    } finally {
+      if (myEpoch === this._epoch) {
+        this.availabilityLoading.set(false);
+      }
+    }
+  }
+
+  /**
+   * Limpia el estado de disponibilidad. Usado cuando barbero/fecha
+   * quedan vacíos. También incrementa `_epoch` para invalidar
+   * cualquier RPC pendiente, de modo que una respuesta tardía
+   * no pueda escribir sobre el estado limpio.
+   */
+  resetOccupiedSlots(): void {
+    this._epoch++;
+    this.occupiedSlotsByBarberDate.set([]);
+    this.availabilityLoading.set(false);
+    this.availabilityError.set(null);
   }
 
   private toMinutes(hhmm: string): number {
