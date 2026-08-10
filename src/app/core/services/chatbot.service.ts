@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ServiceCatalogService } from './service-catalog.service';
 import { BarberService } from './barber.service';
@@ -123,6 +124,7 @@ export class ChatbotService {
   private catalog = inject(ServiceCatalogService);
   private barbers = inject(BarberService);
   private http    = inject(HttpClient);
+  private router  = inject(Router);
 
   // ───── Estado público ─────
   private nextId = 1;
@@ -207,20 +209,19 @@ export class ChatbotService {
 
   /**
    * Helper: ejecuta una navegación desde una acción del AI.
-   * Lo expone el service para que el componente lo llame.
+   * Usa Angular Router (respeta el base-href en GitHub Pages).
    */
   executeAction(action: AIResponse['action']): void {
     if (!action || action.type !== 'navigate') return;
-    // Lo importamos lazy para no crear dependencia circular
-    import('@angular/router').then(({ Router }) => {
-      // Use the router via a global event or just delay
-      // Mejor: usamos location directamente
-      const url = action.path +
-        (action.queryParams
-          ? '?' + Object.entries(action.queryParams)
-              .map(([k, v]) => `${k}=${v}`).join('&')
-          : '');
-      window.location.href = url;
+    // Limpiamos el "/" inicial y dividimos en segmentos de ruta.
+    // Ej: "/nueva-cita" → ["nueva-cita"]
+    //     "/citas/editar/3" → ["citas", "editar", "3"]
+    const segments = action.path
+      .replace(/^\/+/, '')
+      .split('/')
+      .filter(Boolean);
+    this.router.navigate(segments, {
+      queryParams: action.queryParams,
     });
   }
 
