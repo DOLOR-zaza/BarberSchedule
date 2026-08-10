@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs/operators';
 import { ErrorBoundary } from '../../shared/components/error-boundary/error-boundary';
 import { InstallPrompt } from '../../shared/components/install-prompt/install-prompt';
+import { environment } from '../../../environments/environment';
 
 interface NavItem {
   label: string;
@@ -18,14 +19,17 @@ interface NavItem {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainLayout {
+  protected readonly showLocalOnly = !environment.useSupabase;
   protected readonly navItems: NavItem[] = [
-    { label: 'Inicio',     path: '/inicio',     icon: '🏠' },
-    { label: 'Citas',      path: '/citas',      icon: '📅' },
-    { label: 'Servicios',  path: '/servicios',  icon: '✂️' },
-    { label: 'Barberos',   path: '/barberos',   icon: '💈' },
-    { label: 'Asistente',  path: '/asistente',  icon: '🤖' },
-    { label: 'Acerca de',  path: '/acerca-de',  icon: 'ℹ️' },
-  ];
+  { label: 'Inicio',     path: '/inicio',     icon: '🏠' },
+  ...(this.showLocalOnly
+    ? [{ label: 'Citas', path: '/citas', icon: '📅' }]
+    : []),
+  { label: 'Servicios',  path: '/servicios',  icon: '✂️' },
+  { label: 'Barberos',   path: '/barberos',   icon: '💈' },
+  { label: 'Asistente',  path: '/asistente',  icon: '🤖' },
+  { label: 'Acerca de',  path: '/acerca-de',  icon: 'ℹ️' },
+];
 
   protected readonly mobileOpen = signal(false);
   protected readonly scrolled   = signal(false);

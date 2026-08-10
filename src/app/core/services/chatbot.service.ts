@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ServiceCatalogService } from './service-catalog.service';
 import { BarberService } from './barber.service';
+import { environment } from '../../../environments/environment';
 
 export type ChatRole = 'user' | 'bot';
 export type ChatMode = 'rule-based' | 'ai';
@@ -182,16 +183,173 @@ export class ChatbotService {
   }
 
   processUserInput(input: string): void {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-    this.pushUser(trimmed);
+  const trimmed = input.trim();
+  if (!trimmed) return;
 
-    // Decidir qué handler usar
-    if (this.mode() === 'ai' && this.aiWebhookUrl()) {
-      this.handleAI(trimmed);
-    } else {
-      this.respondWithDelay(() => this.handle(trimmed), 400);
+  this.pushUser(trimmed);
+
+  /**
+   * V24 pública:
+   * la consulta/modificación de citas existentes todavía no está
+   * disponible sin autenticación.
+   *
+   * Interceptamos estos intents ANTES de enviarlos a n8n/DeepSeek,
+   * para evitar que la IA prometa funciones administrativas o
+   * solicite datos que la aplicación aún no puede verificar.
+   */
+  if (
+    environment.useSupabase &&
+    this.isRestrictedAppointmentIntent(trimmed)
+  ) {
+    this.respondWithDelay(
+      () => this.handleRestrictedAppointmentIntent(trimmed),
+      300,
+    );
+    return;
+  }
+
+  // Decidir qué handler usar
+  if (this.mode() === 'ai' && this.aiWebhookUrl()) {
+    void this.handleAI(trimmed);
+  } else {
+    this.respondWithDelay(() => this.handle(trimmed), 400);
+  }
+}
+
+
+  /**
+   * Detecta intenciones relacionadas con consultar o modificar
+   * citas existentes.
+   *
+   * En V24 pública estas operaciones permanecen cerradas hasta
+   * implementar autenticación y administración segura en V25.
+   */
+  private isRestrictedAppointmentIntent(input: string): boolean {
+    const text = norm(input);
+
+    const wantsCancel =
+      /\b(cancelar|anular)\b/.test(text) ||
+      text.includes('no puedo ir') ||
+      text.includes('no voy a poder');
+
+    const wantsEdit =
+      text.includes('editar mi cita') ||
+      text.includes('editar cita') ||
+      text.includes('modificar mi cita') ||
+      text.includes('modificar cita') ||
+      text.includes('cambiar mi cita') ||
+      text.includes('reagendar mi cita') ||
+      text.includes('reagendar cita') ||
+      text.includes('mover mi cita');
+
+    const wantsToView =
+      text.includes('mis citas') ||
+      text.includes('ver mis citas') ||
+      text.includes('consultar mis citas') ||
+      text.includes('citas agendadas') ||
+      text.includes('mis reservas') ||
+      text.includes('ver mi cita') ||
+      text.includes('buscar mi cita');
+
+    const alreadyBooked =
+      text.includes('ya tengo cita') ||
+      text.includes('ya tengo una cita') ||
+      text.includes('ya agende') ||
+      text.includes('ya reserve') ||
+      text.includes('ya quedo');
+
+    return wantsCancel || wantsEdit || wantsToView || alreadyBooked;
+  }
+
+  /**
+   * Respuesta segura para operaciones sobre citas existentes
+   * en la versión pública.
+   */
+  private handleRestrictedAppointmentIntent(input: string): void {
+    const text = norm(input);
+
+    if (
+      /\b(cancelar|anular)\b/.test(text) ||
+      text.includes('no puedo ir') ||
+      text.includes('no voy a poder')
+    ) {
+      this.pushBot(
+        'La cancelación de citas existentes todavía no está disponible desde la versión pública. ' +
+        'Si necesitas cancelar una reserva, comunícate directamente con la barbería.',
+        ['Crear una nueva', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
+      );
+      return;
     }
+
+    if (
+      text.includes('editar mi cita') ||
+      text.includes('editar cita') ||
+      text.includes('modificar mi cita') ||
+      text.includes('modificar cita') ||
+      text.includes('cambiar mi cita') ||
+      text.includes('reagendar mi cita') ||
+      text.includes('reagendar cita') ||
+      text.includes('mover mi cita')
+    ) {
+      this.pushBot(
+        'La edición o reagendado de citas existentes todavía no está disponible desde la versión pública. ' +
+        'Si necesitas cambiar una reserva, comunícate directamente con la barbería.',
+        ['Crear una nueva', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
+      );
+      return;
+    }
+
+    if (
+      text.includes('mis citas') ||
+      text.includes('ver mis citas') ||
+      text.includes('consultar mis citas') ||
+      text.includes('citas agendadas') ||
+      text.includes('mis reservas') ||
+      text.includes('ver mi cita') ||
+      text.includes('buscar mi cita')
+    ) {
+      this.pushBot(
+        'Por privacidad, la versión pública no muestra la lista de citas existentes. ' +
+        'Tu reserva sí queda registrada cuando completas el formulario.',
+        ['Crear una nueva', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
+      );
+      return;
+    }
+
+    if (
+      text.includes('ya tengo cita') ||
+      text.includes('ya tengo una cita') ||
+      text.includes('ya agende') ||
+      text.includes('ya reserve') ||
+      text.includes('ya quedo')
+    ) {
+      this.pushBot(
+        '¡Genial! Tu cita quedó registrada. 💈 ' +
+        'Si necesitas hacer algún cambio, comunícate directamente con la barbería.',
+        ['Crear una nueva', 'Otra cosa'],
+        undefined,
+        undefined,
+        'rule-based',
+      );
+      return;
+    }
+
+    this.pushBot(
+      'La gestión de citas existentes todavía no está disponible desde la versión pública.',
+      ['Crear una nueva', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
   }
 
   buildFormLink(serviceId?: number, barberId?: number) {
@@ -212,18 +370,31 @@ export class ChatbotService {
    * Usa Angular Router (respeta el base-href en GitHub Pages).
    */
   executeAction(action: AIResponse['action']): void {
-    if (!action || action.type !== 'navigate') return;
-    // Limpiamos el "/" inicial y dividimos en segmentos de ruta.
-    // Ej: "/nueva-cita" → ["nueva-cita"]
-    //     "/citas/editar/3" → ["citas", "editar", "3"]
-    const segments = action.path
-      .replace(/^\/+/, '')
-      .split('/')
-      .filter(Boolean);
-    this.router.navigate(segments, {
-      queryParams: action.queryParams,
-    });
+  if (!action || action.type !== 'navigate') return;
+
+  // V24 pública: las rutas que requieren acceso a appointments
+  // permanecen cerradas hasta implementar Auth/admin.
+  if (
+    environment.useSupabase &&
+    (
+      action.path === '/citas' ||
+      action.path.startsWith('/citas/') ||
+      action.path === '/gestion'
+    )
+  ) {
+    this.router.navigate(['/inicio']);
+    return;
   }
+
+  const segments = action.path
+    .replace(/^\/+/, '')
+    .split('/')
+    .filter(Boolean);
+
+  this.router.navigate(segments, {
+    queryParams: action.queryParams,
+  });
+}
 
   // ─────────────────────────────────────────────────────────
   //  AI HANDLER (DeepSeek via n8n)
@@ -254,8 +425,21 @@ export class ChatbotService {
         throw new Error('Respuesta vacía del bot AI');
       }
 
-      const text = response.text;
-      const action = response.action;
+      const restrictedAction =
+  environment.useSupabase &&
+  response.action?.type === 'navigate' &&
+  (
+    response.action.path === '/citas' ||
+    response.action.path.startsWith('/citas/') ||
+    response.action.path === '/gestion'
+  );
+
+const text = restrictedAction
+  ? 'La gestión de citas existentes no está disponible desde la versión pública. ' +
+    'Puedo ayudarte a crear una nueva cita, ver servicios o conocer al equipo.'
+  : response.text;
+
+const action = restrictedAction ? null : response.action;
 
       // Renderizar la respuesta con quick replies + acción
       const quickReplies = action
@@ -557,38 +741,71 @@ export class ChatbotService {
     }
 
     if (this.matchIntent(text, ['cancelar', 'anular', 'no puedo ir', 'no voy a poder'])) {
-      this.pushBot(
-        'Para cancelar o modificar una cita, ve a **Citas** en el menú, busca la tuya y usa el botón "Cancelar".\n\n' +
-        '¿Quieres que te lleve?',
-        ['Ir a Citas', 'Otra cosa'],
-        undefined,
-        undefined,
-        'rule-based',
-      );
-      return;
-    }
+  if (environment.useSupabase) {
+    this.pushBot(
+      'La cancelación de citas existentes todavía no está disponible desde la versión pública. ' +
+      'Si necesitas cancelar una reserva, comunícate directamente con la barbería.',
+      ['Crear una nueva', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  } else {
+    this.pushBot(
+      'Para cancelar o modificar una cita, ve a **Citas** en el menú, busca la tuya y usa el botón "Cancelar".\n\n' +
+      '¿Quieres que te lleve?',
+      ['Ir a Citas', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  }
+  return;
+}
 
     if (this.matchIntent(text, ['cambiar', 'modificar', 'reagendar', 'mover', 'editar cita'])) {
-      this.pushBot(
-        'Para cambiar fecha u hora, ve a **Citas** y usa el botón "Editar" en la card correspondiente.',
-        ['Ir a Citas', 'Otra cosa'],
-        undefined,
-        undefined,
-        'rule-based',
-      );
-      return;
-    }
+  if (environment.useSupabase) {
+    this.pushBot(
+      'La edición o reagendado de citas existentes todavía no está disponible desde la versión pública. ' +
+      'Si necesitas cambiar una reserva, comunícate directamente con la barbería.',
+      ['Crear una nueva', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  } else {
+    this.pushBot(
+      'Para cambiar fecha u hora, ve a **Citas** y usa el botón "Editar" en la card correspondiente.',
+      ['Ir a Citas', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  }
+  return;
+}
 
     if (this.matchIntent(text, ['mis citas', 'citas agendadas', 'lo que tengo', 'que tengo', 'mis reservas'])) {
-      this.pushBot(
-        'En la página **Citas** puedes ver, filtrar y editar todas tus reservas. ¿Te llevo?',
-        ['Ir a Citas', 'Crear una nueva'],
-        undefined,
-        undefined,
-        'rule-based',
-      );
-      return;
-    }
+  if (environment.useSupabase) {
+    this.pushBot(
+      'Por privacidad, la versión pública no muestra la lista de citas existentes. ' +
+      'Tu reserva sí queda registrada cuando completas el formulario.',
+      ['Crear una nueva', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  } else {
+    this.pushBot(
+      'En la página **Citas** puedes ver, filtrar y editar todas tus reservas. ¿Te llevo?',
+      ['Ir a Citas', 'Crear una nueva'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  }
+  return;
+}
 
     if (this.matchIntent(text, ['pago', 'pagos', 'pagar', 'cobro', 'efectivo', 'tarjeta', 'transferencia', 'metodo de pago', 'como pago', 'aceptan'])) {
       this.pushBot(
@@ -706,15 +923,25 @@ export class ChatbotService {
     }
 
     if (this.matchIntent(text, ['ya agende', 'ya tengo cita', 'ya reserve', 'ya quedo', 'ya agendo'])) {
-      this.pushBot(
-        '¡Genial! Si quieres ver, editar o cancelar, ve a **Citas**. ¿Te llevo?',
-        ['Ir a Citas', 'Otra cosa'],
-        undefined,
-        undefined,
-        'rule-based',
-      );
-      return;
-    }
+  if (environment.useSupabase) {
+    this.pushBot(
+      '¡Genial! Tu cita quedó registrada. 💈 Si necesitas hacer algún cambio, comunícate directamente con la barbería.',
+      ['Crear una nueva', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  } else {
+    this.pushBot(
+      '¡Genial! Si quieres ver, editar o cancelar, ve a **Citas**. ¿Te llevo?',
+      ['Ir a Citas', 'Otra cosa'],
+      undefined,
+      undefined,
+      'rule-based',
+    );
+  }
+  return;
+}
 
     if (this.matchIntent(text, ['http', 'www', 'instagram', 'facebook', 'tiktok', 'twitter', 'redes'])) {
       this.pushBot(
@@ -824,19 +1051,34 @@ export class ChatbotService {
   }
 
   private handleNavigation(): void {
+  if (environment.useSupabase) {
     this.pushBot(
       '📍 Puedo llevarte a:\n\n' +
-      '• **Citas** — ver/editar/cancelar\n' +
       '• **Servicios** — ver catálogo\n' +
       '• **Barberos** — conocer al equipo\n' +
-      '• **Inicio** — dashboard\n\n' +
-      '¿A cuál vamos?',
-      ['Ir a Citas', 'Ver servicios', 'Ver barberos', 'Ir a inicio'],
+      '• **Inicio** — página principal\n\n' +
+      'También puedo ayudarte a agendar una nueva cita.',
+      ['Ir al formulario', 'Ver servicios', 'Ver barberos', 'Ir a inicio'],
       undefined,
       undefined,
       'rule-based',
     );
+    return;
   }
+
+  this.pushBot(
+    '📍 Puedo llevarte a:\n\n' +
+    '• **Citas** — ver/editar/cancelar\n' +
+    '• **Servicios** — ver catálogo\n' +
+    '• **Barberos** — conocer al equipo\n' +
+    '• **Inicio** — dashboard\n\n' +
+    '¿A cuál vamos?',
+    ['Ir a Citas', 'Ver servicios', 'Ver barberos', 'Ir a inicio'],
+    undefined,
+    undefined,
+    'rule-based',
+  );
+}
 
   private handleHorarios(): void {
     this.pushBot(

@@ -1,6 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { AppointmentService, BarberService, ServiceCatalogService } from './core/services';
+import {
+  AppointmentService,
+  BarberService,
+  ServiceCatalogService,
+} from './core/services';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
@@ -15,15 +20,26 @@ export class App implements OnInit {
   private catalog      = inject(ServiceCatalogService);
 
   /**
-   * Precargamos los catálogos al iniciar la app.
-   * json-server debe estar corriendo (npm run server) o
-   * el módulo de Citas cargará datos vacíos.
+   * Precarga de datos globales.
+   *
+   * Dev:
+   *   services/barbers/appointments → json-server
+   *
+   * Prod:
+   *   services/barbers → Supabase
+   *   appointments NO se cargan públicamente porque contienen PII
+   *   y SELECT está bloqueado por diseño.
    */
   async ngOnInit(): Promise<void> {
-    await Promise.all([
-      this.appointments.loadAll(),
+    const loads: Promise<void>[] = [
       this.barbers.loadAll(),
       this.catalog.loadAll(),
-    ]);
+    ];
+
+    if (!environment.useSupabase) {
+      loads.push(this.appointments.loadAll());
+    }
+
+    await Promise.all(loads);
   }
 }

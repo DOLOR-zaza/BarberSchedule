@@ -8,6 +8,7 @@ import { Hero3dScene } from '../../shared/components/hero3d-scene/hero3d-scene';
 import { AnimatedCounterDirective } from '../../shared/directives/animated-counter.directive';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 
 @Component({
@@ -17,6 +18,7 @@ import { map } from 'rxjs/operators';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomePage {
+  protected readonly showAppointmentData = !environment.useSupabase;
   protected readonly appts  = inject(AppointmentService);
   protected readonly barbers = inject(BarberService);
   protected readonly catalog = inject(ServiceCatalogService);

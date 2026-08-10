@@ -99,12 +99,16 @@
     </p>
     <!-- Entrada oculta al panel de gestión (admin/staff).
          Está en el footer para no ser obvia al cliente casual. -->
-    <a
-      routerLink="/gestion"
-      aria-label="Acceso interno"
-      title="Acceso interno"
-      class="opacity-30 hover:opacity-100 transition-opacity text-base px-2"
-    >⚙</a>
+    @if (showLocalOnly) {
+  <a
+    routerLink="/gestion"
+    aria-label="Acceso interno"
+    title="Acceso interno"
+    class="opacity-30 hover:opacity-100 transition-opacity text-base px-2"
+  >
+    ⚙
+  </a>
+}
   </div>
 </footer>
 
