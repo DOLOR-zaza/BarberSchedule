@@ -17,6 +17,7 @@ import { ChatbotService } from '../../../../core/services/chatbot.service';
 import { N8nService } from '../../../../core/services/n8n.service';
 import { AppointmentCard } from '../../../appointments/components/appointment-card/appointment-card';
 import { ConfirmModal } from '../../../../shared/components/confirm-modal/confirm-modal';
+import { environment } from '../../../../../environments/environment';
 
 type Filter = 'todas' | AppointmentStatus;
 
@@ -27,11 +28,27 @@ type Filter = 'todas' | AppointmentStatus;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GestionPage {
-  private apptService = inject(AppointmentService);
-  private router = inject(Router);
+  private readonly apptService = inject(AppointmentService);
+  private readonly router = inject(Router);
 
   protected readonly n8n = inject(N8nService);
   protected readonly bot = inject(ChatbotService);
+
+  /**
+   * V25.4:
+   * GitHub Pages es frontend público. No debemos guardar/configurar
+   * webhooks privados ni automatizaciones LIVE desde el navegador.
+   *
+   * DEV:
+   *   n8n local + DeepSeek pueden seguir usándose para demostración.
+   *
+   * PROD:
+   *   se fuerza n8n OFF + BarberBot básico.
+   *   La automatización real deberá ejecutarse server-side
+   *   (n8n hospedado / Supabase Edge Function / Database Webhook).
+   */
+  protected readonly productionAutomationLocked =
+    environment.useSupabase;
 
   protected readonly filter = signal<Filter>('todas');
   protected readonly search = signal<string>('');
@@ -108,17 +125,34 @@ export class GestionPage {
   protected readonly ALL_STATUSES = APPOINTMENT_STATUSES;
 
   constructor() {
-    this.n8n.restore();
+    if (this.productionAutomationLocked) {
+      /**
+       * Evita que una configuración antigua guardada en localStorage
+       * active accidentalmente llamadas browser -> webhook en PROD.
+       */
+      this.n8n.configure({
+        mode: 'disabled',
+        webhookUrl: '',
+      });
 
-    // V25.2:
-    // la ruta está detrás de adminGuard; al entrar cargamos
-    // las citas desde json-server (DEV) o Supabase (PROD).
+      this.bot.configure({
+        mode: 'rule-based',
+        webhookUrl: '',
+      });
+    } else {
+      this.n8n.restore();
+    }
+
     void this.apptService.loadAll();
   }
 
   protected onN8nModeChange(
     mode: 'disabled' | 'demo' | 'live',
   ): void {
+    if (this.productionAutomationLocked) {
+      return;
+    }
+
     this.n8n.configure({
       mode,
       webhookUrl: this.n8n.webhookUrl(),
@@ -126,6 +160,10 @@ export class GestionPage {
   }
 
   protected onN8nUrlChange(url: string): void {
+    if (this.productionAutomationLocked) {
+      return;
+    }
+
     this.n8n.configure({
       mode: this.n8n.mode(),
       webhookUrl: url,
@@ -135,10 +173,18 @@ export class GestionPage {
   protected onChatModeChange(
     mode: 'rule-based' | 'ai',
   ): void {
+    if (this.productionAutomationLocked) {
+      return;
+    }
+
     this.bot.configure({ mode });
   }
 
   protected onAIWebhookChange(url: string): void {
+    if (this.productionAutomationLocked) {
+      return;
+    }
+
     this.bot.configure({ webhookUrl: url });
   }
 

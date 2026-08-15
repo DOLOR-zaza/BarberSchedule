@@ -1,5 +1,5 @@
 <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <!-- Header con badge "modo gestión" -->
+  <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
     <div>
       <div class="flex items-center gap-3 mb-2">
@@ -7,234 +7,352 @@
           <span>⚙</span> Modo gestión
         </span>
       </div>
+
       <h1 class="text-5xl font-display font-bold">Panel interno</h1>
       <p class="text-ink-400 mt-1 text-sm">
         Vista administrativa — solo personal de la barbería
       </p>
     </div>
-    <a
-      routerLink="/nueva-cita"
-      class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold transition-all shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 self-start sm:self-auto"
-    >
-      <span class="text-xl">＋</span> Nueva cita
-    </a>
+
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        (click)="reload()"
+        [disabled]="loading()"
+        class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 hover:bg-white/10 text-ink-200 font-medium transition-all ring-1 ring-white/10 disabled:opacity-50"
+      >
+        ↻ Actualizar
+      </button>
+
+      <a
+        routerLink="/nueva-cita"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold transition-all shadow-lg shadow-brand-500/30 hover:-translate-y-0.5"
+      >
+        <span class="text-xl">＋</span> Nueva cita
+      </a>
+    </div>
   </div>
 
-  <!-- Stats rápidas (solo visibles aquí, no en /citas) -->
+  <!-- Stats -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="glass-light rounded-2xl p-5">
-      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">Total</div>
-      <div class="text-3xl font-display font-bold text-ink-100">{{ totalCount() }}</div>
+      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">
+        Total
+      </div>
+      <div class="text-3xl font-display font-bold text-ink-100">
+        {{ totalCount() }}
+      </div>
       <div class="text-ink-500 text-xs mt-1">citas registradas</div>
     </div>
+
     <div class="glass-light rounded-2xl p-5">
-      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">Hoy</div>
-      <div class="text-3xl font-display font-bold text-brand-300">{{ todayCount() }}</div>
+      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">
+        Hoy
+      </div>
+      <div class="text-3xl font-display font-bold text-brand-300">
+        {{ todayCount() }}
+      </div>
       <div class="text-ink-500 text-xs mt-1">citas hoy</div>
     </div>
+
     <div class="glass-light rounded-2xl p-5">
-      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">Pendientes</div>
-      <div class="text-3xl font-display font-bold text-amber-300">{{ counts().pendiente }}</div>
+      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">
+        Pendientes
+      </div>
+      <div class="text-3xl font-display font-bold text-amber-300">
+        {{ counts().pendiente }}
+      </div>
       <div class="text-ink-500 text-xs mt-1">por confirmar</div>
     </div>
+
     <div class="glass-light rounded-2xl p-5">
-      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">Confirmadas</div>
-      <div class="text-3xl font-display font-bold text-emerald-300">{{ counts().confirmada }}</div>
+      <div class="text-ink-500 text-xs uppercase tracking-widest mb-1">
+        Confirmadas
+      </div>
+      <div class="text-3xl font-display font-bold text-emerald-300">
+        {{ counts().confirmada }}
+      </div>
       <div class="text-ink-500 text-xs mt-1">en agenda</div>
     </div>
   </div>
 
-  <!-- Panel de n8n: notificaciones automáticas WhatsApp + Email -->
-  <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-white/5">
-    <div class="flex items-start justify-between gap-4 mb-4">
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-xl">⚡</span>
-          <h2 class="font-display text-lg font-bold">Notificaciones automáticas (n8n)</h2>
-        </div>
-        <p class="text-ink-400 text-sm">
-          Cuando se crea, confirma, cancela o elimina una cita, se dispara un
-          webhook a n8n que manda <strong class="text-ink-200">WhatsApp</strong> y
-          <strong class="text-ink-200">Email</strong> automáticamente.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 text-xs">
-        <span class="px-2 py-1 rounded-full"
-              [class]="n8n.mode() === 'live'    ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30' :
-                       n8n.mode() === 'demo'    ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30' :
-                                                   'bg-white/5 text-ink-400 ring-1 ring-white/10'">
-          @if (n8n.mode() === 'live')    { ● LIVE }
-          @if (n8n.mode() === 'demo')    { ◐ DEMO }
-          @if (n8n.mode() === 'disabled'){ ○ OFF }
-        </span>
-      </div>
-    </div>
+  @if (productionAutomationLocked) {
+    <!--
+      Producción segura:
+      GitHub Pages NO almacena webhooks privados ni API keys.
+      n8n/DeepSeek se mantienen fuera del bundle.
+    -->
+    <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-emerald-500/20 bg-emerald-500/5">
+      <div class="flex items-start gap-4">
+        <span class="text-2xl">🔐</span>
 
-    <!-- Controles -->
-    <div class="grid md:grid-cols-3 gap-4 mb-4">
-      <div>
-        <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">Modo</label>
-        <div class="flex gap-1 p-1 bg-ink-900/60 rounded-lg ring-1 ring-white/5">
-          <button type="button" (click)="onN8nModeChange('disabled')"
-            class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            [class]="n8n.mode() === 'disabled' ? 'bg-white/10 text-ink-100' : 'text-ink-400 hover:text-ink-200'">
-            OFF
-          </button>
-          <button type="button" (click)="onN8nModeChange('demo')"
-            class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            [class]="n8n.mode() === 'demo' ? 'bg-amber-500/20 text-amber-200' : 'text-ink-400 hover:text-ink-200'">
-            DEMO
-          </button>
-          <button type="button" (click)="onN8nModeChange('live')"
-            class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            [class]="n8n.mode() === 'live' ? 'bg-emerald-500/20 text-emerald-200' : 'text-ink-400 hover:text-ink-200'">
-            LIVE
-          </button>
-        </div>
-        <p class="text-ink-500 text-[10px] mt-1.5">
-          DEMO: log en consola. LIVE: POST al webhook.
-        </p>
-      </div>
-      <div class="md:col-span-2">
-        <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">Webhook URL (n8n)</label>
-        <input
-          type="url"
-          [value]="n8n.webhookUrl()"
-          (input)="onN8nUrlChange($any($event.target).value)"
-          placeholder="http://localhost:5678/webhook/abc-123"
-          class="w-full px-3 py-2 rounded-lg bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-600 text-sm transition-all"
-        />
-        <p class="text-ink-500 text-[10px] mt-1.5">
-          En n8n: crear workflow con nodo <code class="text-ink-300">Webhook</code> como trigger.
-        </p>
-      </div>
-    </div>
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <h2 class="font-display text-lg font-bold">
+              Automatización protegida
+            </h2>
 
-    <!-- Métricas + historial -->
-    <div class="grid md:grid-cols-2 gap-4">
-      <div class="bg-ink-900/40 rounded-lg p-3 ring-1 ring-white/5">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-ink-400">Enviadas</span>
-          <span class="text-emerald-300 font-mono font-bold">{{ n8n.totalSent() }}</span>
-        </div>
-        <div class="flex items-center justify-between text-xs mt-1">
-          <span class="text-ink-400">Errores</span>
-          <span class="text-rose-300 font-mono font-bold">{{ n8n.totalErrors() }}</span>
-        </div>
-        <div class="flex items-center justify-between text-xs mt-1">
-          <span class="text-ink-400">Última</span>
-          <span class="text-ink-200 font-mono">{{ n8n.lastResult()?.message ?? '—' }}</span>
-        </div>
-      </div>
-      <div class="bg-ink-900/40 rounded-lg p-3 ring-1 ring-white/5 max-h-32 overflow-y-auto">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-ink-400 text-xs">Historial reciente</span>
-          @if (n8n.history().length > 0) {
-            <button (click)="n8n.clearHistory()" class="text-[10px] text-ink-500 hover:text-ink-300">
-              limpiar
-            </button>
-          }
-        </div>
-        @if (n8n.history().length === 0) {
-          <p class="text-ink-500 text-xs italic">Sin actividad reciente.</p>
-        }
-        @for (h of n8n.history(); track h.timestamp) {
-          <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-white/5 last:border-0">
-            <span class="text-ink-300 font-mono">{{ h.event }}</span>
-            <span class="text-ink-500">{{ h.appointment.clientName }}</span>
-            <span [class]="h.result.delivered ? 'text-emerald-400' : 'text-rose-400'">
-              {{ h.result.mode }}
+            <span class="px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30 text-xs">
+              PRODUCCIÓN SEGURA
             </span>
           </div>
-        }
+
+          <p class="text-ink-300 text-sm">
+            Los webhooks de n8n y las credenciales de DeepSeek no se
+            configuran desde este navegador. BarberBot usa el modo básico
+            en producción y la gestión de citas continúa funcionando
+            directamente con Supabase y RLS.
+          </p>
+
+          <p class="text-ink-500 text-xs mt-2">
+            Para activar automatizaciones LIVE posteriormente, n8n deberá
+            estar hospedado y conectarse desde backend, Supabase Edge
+            Functions o Database Webhooks; nunca guardando secretos en Angular.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
+  } @else {
+    <!-- DEV: n8n local -->
+    <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-white/5">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">⚡</span>
+            <h2 class="font-display text-lg font-bold">
+              Notificaciones automáticas (n8n)
+            </h2>
+          </div>
 
-  <!-- Panel de AI Chatbot (DeepSeek via n8n) -->
-  <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-white/5">
-    <div class="flex items-start justify-between gap-4 mb-4">
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-xl">🧠</span>
-          <h2 class="font-display text-lg font-bold">Chatbot AI (DeepSeek)</h2>
+          <p class="text-ink-400 text-sm">
+            Herramientas de desarrollo local para probar el workflow de
+            notificaciones sin introducir secretos en producción.
+          </p>
         </div>
-        <p class="text-ink-400 text-sm">
-          Conecta el bot conversacional con un workflow de n8n que llama a
-          <strong class="text-ink-200">DeepSeek</strong>. Entiende lenguaje natural,
-          mantiene contexto, y puede navegar al formulario automáticamente.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 text-xs">
-        <span class="px-2 py-1 rounded-full"
-              [class]="bot.mode() === 'ai' && bot.aiWebhookUrl() ? 'bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30' :
-                       'bg-white/5 text-ink-400 ring-1 ring-white/10'">
-          @if (bot.mode() === 'ai' && bot.aiWebhookUrl()) { ● ACTIVO }
-          @else { ○ INACTIVO }
+
+        <span
+          class="px-2 py-1 rounded-full text-xs"
+          [class]="n8n.mode() === 'live'
+            ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+            : n8n.mode() === 'demo'
+              ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
+              : 'bg-white/5 text-ink-400 ring-1 ring-white/10'"
+        >
+          @if (n8n.mode() === 'live') { ● LIVE }
+          @if (n8n.mode() === 'demo') { ◐ DEMO }
+          @if (n8n.mode() === 'disabled') { ○ OFF }
         </span>
       </div>
-    </div>
 
-    <div class="grid md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">Modo de operación</label>
-        <div class="flex gap-1 p-1 bg-ink-900/60 rounded-lg ring-1 ring-white/5">
-          <button type="button" (click)="onChatModeChange('rule-based')"
-            class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            [class]="bot.mode() === 'rule-based' ? 'bg-white/10 text-ink-100' : 'text-ink-400 hover:text-ink-200'">
-            🤖 Básico
-          </button>
-          <button type="button" (click)="onChatModeChange('ai')"
-            class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            [class]="bot.mode() === 'ai' ? 'bg-violet-500/30 text-violet-100 ring-1 ring-violet-500/40' : 'text-ink-400 hover:text-ink-200'">
-            🧠 AI
-          </button>
+      <div class="grid md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">
+            Modo
+          </label>
+
+          <div class="flex gap-1 p-1 bg-ink-900/60 rounded-lg ring-1 ring-white/5">
+            <button
+              type="button"
+              (click)="onN8nModeChange('disabled')"
+              class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              [class]="n8n.mode() === 'disabled'
+                ? 'bg-white/10 text-ink-100'
+                : 'text-ink-400 hover:text-ink-200'"
+            >
+              OFF
+            </button>
+
+            <button
+              type="button"
+              (click)="onN8nModeChange('demo')"
+              class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              [class]="n8n.mode() === 'demo'
+                ? 'bg-amber-500/20 text-amber-200'
+                : 'text-ink-400 hover:text-ink-200'"
+            >
+              DEMO
+            </button>
+
+            <button
+              type="button"
+              (click)="onN8nModeChange('live')"
+              class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              [class]="n8n.mode() === 'live'
+                ? 'bg-emerald-500/20 text-emerald-200'
+                : 'text-ink-400 hover:text-ink-200'"
+            >
+              LIVE
+            </button>
+          </div>
         </div>
-        <p class="text-ink-500 text-[10px] mt-1.5">
-          AI: ~$0.14 por 1M tokens. Más inteligente pero requiere API key.
-        </p>
+
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">
+            Webhook URL (n8n local)
+          </label>
+
+          <input
+            type="url"
+            [value]="n8n.webhookUrl()"
+            (input)="onN8nUrlChange($any($event.target).value)"
+            placeholder="http://localhost:5678/webhook/..."
+            class="w-full px-3 py-2 rounded-lg bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-600 text-sm transition-all"
+          />
+        </div>
       </div>
-      <div>
-        <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">Webhook URL (n8n AI)</label>
-        <input
-          type="url"
-          [value]="bot.aiWebhookUrl()"
-          (input)="onAIWebhookChange($any($event.target).value)"
-          placeholder="http://localhost:5678/webhook/chat-abc"
-          class="w-full px-3 py-2 rounded-lg bg-ink-900/60 border border-white/5 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none text-ink-100 placeholder-ink-600 text-sm transition-all"
-        />
-        <p class="text-ink-500 text-[10px] mt-1.5">
-          Workflow separado del de notificaciones. Usa <code class="text-ink-300">barberschedule-ai-chatbot.json</code>.
-        </p>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-ink-900/40 rounded-lg p-3 ring-1 ring-white/5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-ink-400">Enviadas</span>
+            <span class="text-emerald-300 font-mono font-bold">
+              {{ n8n.totalSent() }}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between text-xs mt-1">
+            <span class="text-ink-400">Errores</span>
+            <span class="text-rose-300 font-mono font-bold">
+              {{ n8n.totalErrors() }}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between text-xs mt-1">
+            <span class="text-ink-400">Última</span>
+            <span class="text-ink-200 font-mono">
+              {{ n8n.lastResult()?.message ?? '—' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="bg-ink-900/40 rounded-lg p-3 ring-1 ring-white/5 max-h-32 overflow-y-auto">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-ink-400 text-xs">Historial reciente</span>
+
+            @if (n8n.history().length > 0) {
+              <button
+                type="button"
+                (click)="n8n.clearHistory()"
+                class="text-[10px] text-ink-500 hover:text-ink-300"
+              >
+                limpiar
+              </button>
+            }
+          </div>
+
+          @if (n8n.history().length === 0) {
+            <p class="text-ink-500 text-xs italic">
+              Sin actividad reciente.
+            </p>
+          }
+
+          @for (h of n8n.history(); track h.timestamp) {
+            <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-white/5 last:border-0">
+              <span class="text-ink-300 font-mono">{{ h.event }}</span>
+              <span class="text-ink-500">{{ h.appointment.clientName }}</span>
+              <span
+                [class]="h.result.delivered
+                  ? 'text-emerald-400'
+                  : 'text-rose-400'"
+              >
+                {{ h.result.mode }}
+              </span>
+            </div>
+          }
+        </div>
       </div>
     </div>
 
-    <details class="bg-ink-900/40 rounded-lg ring-1 ring-white/5">
-      <summary class="px-3 py-2 cursor-pointer text-xs text-ink-300 hover:text-ink-100 select-none">
-        ⚙️ ¿Cómo configuro n8n con DeepSeek?
-      </summary>
-      <div class="px-3 pb-3 text-[11px] text-ink-400 space-y-2">
-        <p>1. Abre n8n en <code class="text-ink-200">http://localhost:5678</code></p>
-        <p>2. Crea un nuevo workflow → importa el archivo <code class="text-ink-200">n8n/barberschedule-ai-chatbot.json</code></p>
-        <p>3. En el nodo <strong>DeepSeek API</strong>, configura credencial <strong>Header Auth</strong>:</p>
-        <pre class="bg-ink-950 p-2 rounded text-[10px]">Name: Authorization
-Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
-        <p>4. Activa el workflow → copia la URL del webhook → pégala arriba</p>
-        <p>5. Cambia el modo a <strong>🧠 AI</strong> y prueba el chat</p>
-        <p class="text-violet-300">💡 <em>Tip: la API key de DeepSeek se guarda en n8n, no en el frontend. El frontend solo conoce la URL del webhook.</em></p>
-      </div>
-    </details>
-  </div>
+    <!-- DEV: DeepSeek via n8n local -->
+    <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-white/5">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">🧠</span>
+            <h2 class="font-display text-lg font-bold">
+              Chatbot AI (DeepSeek)
+            </h2>
+          </div>
 
-  <!-- Toolbar: search + filter chips -->
+          <p class="text-ink-400 text-sm">
+            Disponible para pruebas locales mediante n8n.
+          </p>
+        </div>
+
+        <span
+          class="px-2 py-1 rounded-full text-xs"
+          [class]="bot.mode() === 'ai' && bot.aiWebhookUrl()
+            ? 'bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30'
+            : 'bg-white/5 text-ink-400 ring-1 ring-white/10'"
+        >
+          @if (bot.mode() === 'ai' && bot.aiWebhookUrl()) {
+            ● ACTIVO
+          } @else {
+            ○ INACTIVO
+          }
+        </span>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">
+            Modo
+          </label>
+
+          <div class="flex gap-1 p-1 bg-ink-900/60 rounded-lg ring-1 ring-white/5">
+            <button
+              type="button"
+              (click)="onChatModeChange('rule-based')"
+              class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              [class]="bot.mode() === 'rule-based'
+                ? 'bg-white/10 text-ink-100'
+                : 'text-ink-400 hover:text-ink-200'"
+            >
+              🤖 Básico
+            </button>
+
+            <button
+              type="button"
+              (click)="onChatModeChange('ai')"
+              class="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              [class]="bot.mode() === 'ai'
+                ? 'bg-violet-500/30 text-violet-100 ring-1 ring-violet-500/40'
+                : 'text-ink-400 hover:text-ink-200'"
+            >
+              🧠 AI
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-ink-300 mb-1.5 uppercase tracking-wider">
+            Webhook URL (n8n AI local)
+          </label>
+
+          <input
+            type="url"
+            [value]="bot.aiWebhookUrl()"
+            (input)="onAIWebhookChange($any($event.target).value)"
+            placeholder="http://localhost:5678/webhook/barber-ai"
+            class="w-full px-3 py-2 rounded-lg bg-ink-900/60 border border-white/5 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none text-ink-100 placeholder-ink-600 text-sm transition-all"
+          />
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Search + filters -->
   <div class="glass rounded-2xl p-4 mb-6 space-y-4">
     <div class="relative">
-      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500">🔍</span>
+      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500">
+        🔍
+      </span>
+
       <input
         type="search"
         [value]="search()"
         (input)="onSearchInput($any($event.target).value)"
-        placeholder="Buscar por nombre, teléfono o notas…"
+        placeholder="Buscar por nombre, teléfono, correo o notas…"
         class="w-full pl-11 pr-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all"
       />
     </div>
@@ -250,9 +368,12 @@ Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
             : 'bg-white/5 text-ink-200 hover:bg-white/10 ring-1 ring-white/5'"
         >
           {{ f.label }}
+
           <span
             class="text-xs px-1.5 py-0.5 rounded-full"
-            [class]="filter() === f.key ? 'bg-ink-950/20' : 'bg-white/5'"
+            [class]="filter() === f.key
+              ? 'bg-ink-950/20'
+              : 'bg-white/5'"
           >
             {{ f.count() }}
           </span>
@@ -261,14 +382,12 @@ Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
     </div>
   </div>
 
-  <!-- Error -->
   @if (error()) {
     <div class="glass rounded-2xl p-6 mb-6 ring-1 ring-rose-500/30 bg-rose-500/5">
       <p class="text-rose-300 text-sm">⚠️ {{ error() }}</p>
     </div>
   }
 
-  <!-- Loading state -->
   @if (loading()) {
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       @for (i of [1,2,3,4,5,6]; track i) {
@@ -281,11 +400,13 @@ Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
     </div>
   }
 
-  <!-- Empty state -->
   @if (!loading() && visible().length === 0) {
     <div class="glass rounded-2xl p-16 text-center">
       <div class="text-7xl mb-4">📭</div>
-      <h2 class="font-display text-2xl font-semibold mb-2">No hay citas</h2>
+      <h2 class="font-display text-2xl font-semibold mb-2">
+        No hay citas
+      </h2>
+
       <p class="text-ink-400 mb-6">
         @if (search()) {
           No encontramos citas con "{{ search() }}".
@@ -298,7 +419,6 @@ Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
     </div>
   }
 
-  <!-- List con [showDelete]="true" — modo admin -->
   @if (!loading() && visible().length > 0) {
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       @for (appt of visible(); track appt.id) {
@@ -317,7 +437,6 @@ Value: Bearer TU_API_KEY_DE_DEEPSEEK</pre>
   }
 </section>
 
-<!-- Modal de confirmación para eliminar -->
 <app-confirm-modal
   [open]="showDeleteModal()"
   title="¿Eliminar esta cita?"
