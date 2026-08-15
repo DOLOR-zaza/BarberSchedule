@@ -110,7 +110,7 @@
         </div>
 
         <div class="text-4xl font-display font-bold text-ink-100">
-          <span [appAnimatedCounter]="stats().total" [duration]="1500">0</span>
+          <span>{{ stats().total }}</span>
         </div>
 
         <div class="text-ink-500 text-sm mt-1">
@@ -128,7 +128,7 @@
         </div>
 
         <div class="text-4xl font-display font-bold text-brand-300">
-          <span [appAnimatedCounter]="stats().today" [duration]="1800">0</span>
+          <span>{{ stats().today }}</span>
         </div>
 
         <div class="text-ink-500 text-sm mt-1">
@@ -146,13 +146,7 @@
         </div>
 
         <div class="text-4xl font-display font-bold text-amber-300">
-          <span
-            [appAnimatedCounter]="stats().pending"
-            [duration]="1500"
-            [delay]="300"
-          >
-            0
-          </span>
+          <span>{{ stats().pending }}</span>
         </div>
       </div>
 
@@ -166,13 +160,7 @@
         </div>
 
         <div class="text-4xl font-display font-bold text-emerald-300">
-          <span
-            [appAnimatedCounter]="stats().confirmed"
-            [duration]="1500"
-            [delay]="500"
-          >
-            0
-          </span>
+          <span>{{ stats().confirmed }}</span>
         </div>
       </div>
     </div>

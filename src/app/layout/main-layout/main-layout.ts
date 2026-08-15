@@ -39,6 +39,7 @@ interface NavItem {
 })
 export class MainLayout {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   /**
    * En DEV mantenemos las herramientas locales.
@@ -46,6 +47,13 @@ export class MainLayout {
    */
   protected readonly showAdminTools = computed(
     () => !environment.useSupabase || this.auth.isAdmin(),
+  );
+
+  protected readonly isAdminSession = computed(
+    () =>
+      environment.useSupabase &&
+      this.auth.isAuthenticated() &&
+      this.auth.isAdmin(),
   );
 
   protected readonly navItems = computed<NavItem[]>(() => [
@@ -70,8 +78,8 @@ export class MainLayout {
   protected readonly mobileOpen = signal(false);
   protected readonly scrolled = signal(false);
 
-  constructor(router: Router) {
-    router.events
+  constructor() {
+    this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
       .subscribe(() => this.closeMobile());
   }
@@ -82,5 +90,11 @@ export class MainLayout {
 
   closeMobile(): void {
     this.mobileOpen.set(false);
+  }
+
+  async logout(): Promise<void> {
+    this.closeMobile();
+    await this.auth.signOut();
+    await this.router.navigateByUrl('/login');
   }
 }

@@ -38,9 +38,13 @@ export class AuthService {
         return;
       }
 
-      setTimeout(() => {
-        void this.refreshAdminStatus();
-      }, 0);
+      // Evita una carrera entre SIGNED_IN y signIn(), que ya valida admin.
+      // Recovery y refresh de token si requieren revalidacion automatica.
+      if (event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED') {
+        setTimeout(() => {
+          void this.refreshAdminStatus();
+        }, 0);
+      }
     });
 
     this.destroyRef.onDestroy(() => subscription.unsubscribe());

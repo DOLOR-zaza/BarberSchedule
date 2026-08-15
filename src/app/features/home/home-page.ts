@@ -17,7 +17,6 @@ import {
 import { StatusBadge } from '../../shared/components/status-badge/status-badge';
 import { TiltOnHoverDirective } from '../../shared/directives/tilt-on-hover.directive';
 import { Hero3dScene } from '../../shared/components/hero3d-scene/hero3d-scene';
-import { AnimatedCounterDirective } from '../../shared/directives/animated-counter.directive';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
@@ -29,7 +28,6 @@ import { environment } from '../../../environments/environment';
     StatusBadge,
     TiltOnHoverDirective,
     Hero3dScene,
-    AnimatedCounterDirective,
   ],
   templateUrl: './home-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

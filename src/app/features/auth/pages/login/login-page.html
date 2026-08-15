@@ -8,41 +8,7 @@
   </a>
 
   <section class="auth-card" aria-labelledby="auth-title">
-    @if (signedInAdmin()) {
-      <div class="status-icon success" aria-hidden="true">✓</div>
-      <p class="eyebrow">V25 · ADMIN</p>
-      <h1 id="auth-title">Sesión administrativa activa</h1>
-      <p class="lead">
-        Iniciaste sesión correctamente como administrador de BarberSchedule.
-      </p>
-
-      <div class="account">
-        <span>Cuenta</span>
-        <strong>{{ auth.email() }}</strong>
-      </div>
-
-      @if (notice()) {
-        <p class="notice success-notice">{{ notice() }}</p>
-      }
-
-      @if (auth.error()) {
-        <p class="notice error-notice">{{ auth.error() }}</p>
-      }
-
-      <div class="actions stacked">
-        <button class="primary" type="button" (click)="goHome()">
-          Continuar al inicio
-        </button>
-        <button
-          class="secondary"
-          type="button"
-          [disabled]="auth.loading()"
-          (click)="logout()"
-        >
-          Cerrar sesión
-        </button>
-      </div>
-    } @else if (mode() === 'password') {
+    @if (mode() === 'password') {
       <p class="eyebrow">SEGURIDAD</p>
       <h1 id="auth-title">Establece tu contraseña</h1>
       <p class="lead">
@@ -96,6 +62,40 @@
       <button class="text-button" type="button" (click)="showLogin()">
         Volver al acceso
       </button>
+    } @else if (signedInAdmin()) {
+      <div class="status-icon success" aria-hidden="true">✓</div>
+      <p class="eyebrow">V25 · ADMIN</p>
+      <h1 id="auth-title">Sesión administrativa activa</h1>
+      <p class="lead">
+        Iniciaste sesión correctamente como administrador de BarberSchedule.
+      </p>
+
+      <div class="account">
+        <span>Cuenta</span>
+        <strong>{{ auth.email() }}</strong>
+      </div>
+
+      @if (notice()) {
+        <p class="notice success-notice">{{ notice() }}</p>
+      }
+
+      @if (auth.error()) {
+        <p class="notice error-notice">{{ auth.error() }}</p>
+      }
+
+      <div class="actions stacked">
+        <button class="primary" type="button" (click)="goHome()">
+          Continuar al inicio
+        </button>
+        <button
+          class="secondary"
+          type="button"
+          [disabled]="auth.loading()"
+          (click)="logout()"
+        >
+          Cerrar sesión
+        </button>
+      </div>
     } @else if (mode() === 'forgot') {
       <p class="eyebrow">RECUPERACIÓN</p>
       <h1 id="auth-title">Crear o recuperar contraseña</h1>
