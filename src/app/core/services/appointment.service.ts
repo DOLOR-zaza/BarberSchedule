@@ -8,42 +8,39 @@ import { SupabaseService } from './supabase.service';
 
 const API_URL = 'http://127.0.0.1:3001/appointments';
 
-/**
- * Servicio central de citas. Usa HttpClient contra json-server
- * y expone la lista como Signal para integración directa con
- * componentes standalone.
- *
- * V24.1.3: `create()` ahora es dual (json-server / Supabase).
- *   - Dev: comportamiento anterior con n8n.notify
- *   - Prod: INSERT en Supabase sin .select() (no tenemos SELECT público),
- *           no actualiza _appointments, no llama n8n.notify.
- */
+type SupabaseAppointmentRow = {
+  id: number;
+  client_name: string;
+  phone: string;
+  email: string;
+  service_id: number;
+  barber_id: number;
+  date: string;
+  time: string;
+  status: AppointmentStatus;
+  notes: string | null;
+};
+
+const ADMIN_SELECT =
+  'id,client_name,phone,email,service_id,barber_id,date,time,status,notes';
+
 @Injectable({ providedIn: 'root' })
 export class AppointmentService {
   private http = inject(HttpClient);
-  private n8n  = inject(N8nService);
+  private n8n = inject(N8nService);
   private supabase = inject(SupabaseService);
 
-  /** Fuente de verdad reactiva (modo local). */
   private readonly _appointments = signal<Appointment[]>([]);
   readonly appointments = this._appointments.asReadonly();
 
-  /** Estado de carga, útil para skeletons. */
   readonly loading = signal<boolean>(false);
-  readonly error   = signal<string | null>(null);
+  readonly error = signal<string | null>(null);
 
-  /**
-   * Disponibilidad consultada. En producción (Supabase) la llena
-   * `loadOccupiedSlots()` desde el RPC `get_occupied_slots`. En dev
-   * la llena `loadAll()` desde json-server y `occupiedSlots()`
-   * filtra del signal local.
-   */
   readonly occupiedSlotsByBarberDate = signal<string[]>([]);
   readonly availabilityLoading = signal<boolean>(false);
-  readonly availabilityError   = signal<string | null>(null);
+  readonly availabilityError = signal<string | null>(null);
   private _epoch = 0;
 
-  // --- Selectores derivados (computed signals) ---
   readonly count = computed(() => this._appointments().length);
 
   readonly todayCount = computed(() => {
@@ -53,65 +50,181 @@ export class AppointmentService {
 
   readonly countsByStatus = computed(() => {
     const acc: Record<AppointmentStatus, number> = {
-      pendiente: 0, confirmada: 0, atendida: 0, cancelada: 0,
+      pendiente: 0,
+      confirmada: 0,
+      atendida: 0,
+      cancelada: 0,
     };
-    for (const a of this._appointments()) acc[a.status]++;
+
+    for (const a of this._appointments()) {
+      acc[a.status]++;
+    }
+
     return acc;
   });
 
-  // --- CRUD ---
+  // ─────────────────────────────────────────────────────────
+  // READ
+  // ─────────────────────────────────────────────────────────
+
   async loadAll(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
+
     try {
-      const data = await firstValueFrom(this.http.get<Appointment[]>(API_URL));
-      this._appointments.set(data);
-    } catch (e) {
-      this.error.set('No se pudieron cargar las citas. ¿json-server está corriendo?');
-      console.error(e);
+      if (environment.useSupabase) {
+        await this.loadAllFromSupabase();
+      } else {
+        await this.loadAllFromJsonServer();
+      }
     } finally {
       this.loading.set(false);
     }
   }
 
-  /**
-   * Crea una cita. Dual:
-   *   - dev (json-server): hasConflict + POST + actualizar _appointments + n8n.notify
-   *   - prod (Supabase): INSERT sin .select() + manejo de 23505
-   *
-   * @returns true si la cita se creó, false si hubo error.
-   *          En caso de error, `this.error` contiene el mensaje
-   *          legible para mostrar en UI.
-   */
-  async create(draft: AppointmentDraft): Promise<boolean> {
-    // Limpiar errores anteriores antes de elegir backend.
-    this.error.set(null);
-    if (environment.useSupabase) {
-      return this.createInSupabase(draft);
+  private async loadAllFromJsonServer(): Promise<void> {
+    try {
+      const data = await firstValueFrom(
+        this.http.get<Appointment[]>(API_URL),
+      );
+
+      this._appointments.set(data);
+    } catch (e) {
+      this._appointments.set([]);
+      this.error.set(
+        'No se pudieron cargar las citas. ¿json-server está corriendo?',
+      );
+      console.error(e);
     }
-    return this.createInJsonServer(draft);
   }
 
   /**
-   * Camino dev: json-server.
-   * Conserva el comportamiento original:
-   *   - hasConflict (validación local)
-   *   - POST a json-server
-   *   - actualizar _appointments
-   *   - notificar a n8n
+   * V25.2:
+   * SELECT administrativo desde Supabase.
+   *
+   * Esta llamada solo funciona con una sesión autenticada que pase
+   * la policy RLS de administrador creada en V25.1.
    */
-  private async createInJsonServer(draft: AppointmentDraft): Promise<boolean> {
+  private async loadAllFromSupabase(): Promise<void> {
+    const { data, error } = await this.supabase.client
+      .from('appointments')
+      .select(ADMIN_SELECT)
+      .order('date', { ascending: false })
+      .order('time', { ascending: false });
+
+    if (error) {
+      this._appointments.set([]);
+      this.error.set(
+        'No se pudieron cargar las citas administrativas. Verifica tu sesión.',
+      );
+      console.error('Error cargando citas desde Supabase:', error);
+      return;
+    }
+
+    this._appointments.set(
+      ((data ?? []) as SupabaseAppointmentRow[]).map((row) =>
+        this.fromSupabaseRow(row),
+      ),
+    );
+  }
+
+  /**
+   * Obtiene una cita específica para edición administrativa.
+   *
+   * Primero revisa el signal local. Si no existe:
+   * - DEV: consulta json-server.
+   * - PROD: consulta Supabase; RLS exige sesión admin.
+   */
+  async getById(id: number): Promise<Appointment | null> {
+    this.error.set(null);
+
+    const cached = this._appointments().find((a) => a.id === id);
+    if (cached) {
+      return cached;
+    }
+
+    if (environment.useSupabase) {
+      const { data, error } = await this.supabase.client
+        .from('appointments')
+        .select(ADMIN_SELECT)
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        this.error.set(
+          'No se pudo cargar la cita. Verifica que exista y que tu sesión administrativa siga activa.',
+        );
+        console.error('Error cargando cita por ID desde Supabase:', error);
+        return null;
+      }
+
+      const appointment = this.fromSupabaseRow(
+        data as SupabaseAppointmentRow,
+      );
+
+      this._appointments.update((list) => {
+        const exists = list.some((a) => a.id === appointment.id);
+        return exists
+          ? list.map((a) => (a.id === appointment.id ? appointment : a))
+          : [...list, appointment];
+      });
+
+      return appointment;
+    }
+
+    try {
+      const appointment = await firstValueFrom(
+        this.http.get<Appointment>(`${API_URL}/${id}`),
+      );
+
+      this._appointments.update((list) => {
+        const exists = list.some((a) => a.id === appointment.id);
+        return exists
+          ? list.map((a) => (a.id === appointment.id ? appointment : a))
+          : [...list, appointment];
+      });
+
+      return appointment;
+    } catch (e) {
+      this.error.set('No se pudo cargar la cita.');
+      console.error(e);
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // CREATE
+  // ─────────────────────────────────────────────────────────
+
+  async create(draft: AppointmentDraft): Promise<boolean> {
+    this.error.set(null);
+
+    if (environment.useSupabase) {
+      return this.createInSupabase(draft);
+    }
+
+    return this.createInJsonServer(draft);
+  }
+
+  private async createInJsonServer(
+    draft: AppointmentDraft,
+  ): Promise<boolean> {
     if (this.hasConflict(draft)) {
       this.error.set('Ese barbero ya tiene una cita en ese horario.');
       return false;
     }
+
     try {
       const created = await firstValueFrom(
         this.http.post<Appointment>(API_URL, draft),
       );
+
       this._appointments.update((list) => [...list, created]);
-      // Notificación vía n8n (fire-and-forget, no bloquea).
-      this.n8n.notify('created', created, { triggeredBy: 'client' });
+
+      this.n8n.notify('created', created, {
+        triggeredBy: 'client',
+      });
+
       return true;
     } catch (e) {
       this.error.set('No se pudo crear la cita.');
@@ -120,79 +233,116 @@ export class AppointmentService {
     }
   }
 
-  /**
-   * Camino prod: Supabase.
-   * Limitaciones conocidas (resueltas en V25 con Supabase Auth):
-   *   - No hacemos hasConflict() porque _appointments está vacío
-   *     (json-server no existe en producción). La DB es la
-   *     barrera definitiva: el índice único parcial
-   *     `uniq_active_appointment` rechaza duplicados con 23505.
-   *   - No usamos .select() porque la policy pública NO permite
-   *     SELECT sobre appointments. Por lo tanto no recibimos el id
-   *     generado, lo que impide llamar a n8n.notify (requiere
-   *     Appointment con id). La notificación de email queda
-   *     pendiente para V25 (service_role en n8n).
-   *   - No actualizamos _appointments (json-server no existe).
-   *   - No actualizamos occupiedSlotsByBarberDate (el form
-   *     navega a otra ruta inmediatamente).
-   */
-  private async createInSupabase(draft: AppointmentDraft): Promise<boolean> {
+  private async createInSupabase(
+    draft: AppointmentDraft,
+  ): Promise<boolean> {
     try {
       const { error } = await this.supabase.client
         .from('appointments')
         .insert({
           client_name: draft.clientName,
-          phone:       draft.phone,
-          email:       draft.email,
-          service_id:  draft.serviceId,
-          barber_id:   draft.barberId,
-          date:        draft.date,
-          time:        draft.time,
-          // Forzar 'pendiente' en INSERT público; no confiar en el form.
-          status:      'pendiente',
-          notes:       draft.notes ?? '',
+          phone: draft.phone,
+          email: draft.email,
+          service_id: draft.serviceId,
+          barber_id: draft.barberId,
+          date: draft.date,
+          time: draft.time,
+          status: 'pendiente',
+          notes: draft.notes ?? '',
         });
-      if (!error) return true;
-      // 23505 = unique_violation del índice uniq_active_appointment
+
+      if (!error) {
+        return true;
+      }
+
       if (error.code === '23505') {
-        this.error.set('Ese horario ya está ocupado. Elige otro horario.');
+        this.error.set(
+          'Ese horario ya está ocupado. Elige otro horario.',
+        );
         return false;
       }
-      this.error.set('No se pudo crear la cita. Intenta nuevamente.');
-      console.error('Error creando cita en Supabase', error);
+
+      this.error.set(
+        'No se pudo crear la cita. Intenta nuevamente.',
+      );
+      console.error('Error creando cita en Supabase:', error);
       return false;
     } catch (e) {
-      // Red caída, timeout, etc.
-      this.error.set('No se pudo crear la cita. Intenta nuevamente.');
-      console.error('Error creando cita en Supabase', e);
+      this.error.set(
+        'No se pudo crear la cita. Intenta nuevamente.',
+      );
+      console.error('Error creando cita en Supabase:', e);
       return false;
     }
   }
 
-  async update(id: number, patch: Partial<AppointmentDraft>): Promise<Appointment | null> {
+  // ─────────────────────────────────────────────────────────
+  // UPDATE
+  // ─────────────────────────────────────────────────────────
+
+  async update(
+    id: number,
+    patch: Partial<AppointmentDraft>,
+  ): Promise<Appointment | null> {
+    this.error.set(null);
+
+    if (environment.useSupabase) {
+      return this.updateInSupabase(id, patch);
+    }
+
+    return this.updateInJsonServer(id, patch);
+  }
+
+  private async updateInJsonServer(
+    id: number,
+    patch: Partial<AppointmentDraft>,
+  ): Promise<Appointment | null> {
     const previous = this._appointments().find((a) => a.id === id);
+
     if (patch.barberId || patch.date || patch.time) {
-      if (!previous) return null;
-      const merged = { ...previous, ...patch } as AppointmentDraft;
+      if (!previous) {
+        return null;
+      }
+
+      const merged = {
+        ...previous,
+        ...patch,
+      } as AppointmentDraft;
+
       if (this.hasConflict(merged, id)) {
-        this.error.set('Ese barbero ya tiene una cita en ese horario.');
+        this.error.set(
+          'Ese barbero ya tiene una cita en ese horario.',
+        );
         return null;
       }
     }
+
     try {
       const updated = await firstValueFrom(
-        this.http.patch<Appointment>(`${API_URL}/${id}`, patch),
+        this.http.patch<Appointment>(
+          `${API_URL}/${id}`,
+          patch,
+        ),
       );
-      this._appointments.update((list) => list.map((a) => (a.id === id ? updated : a)));
+
+      this._appointments.update((list) =>
+        list.map((a) => (a.id === id ? updated : a)),
+      );
+
       const event =
-        updated.status === 'confirmada' ? 'confirmed' :
-        updated.status === 'atendida'   ? 'attended'   :
-        updated.status === 'cancelada'  ? 'cancelled'  :
-        'updated';
+        updated.status === 'confirmada'
+          ? 'confirmed'
+          : updated.status === 'atendida'
+            ? 'attended'
+            : updated.status === 'cancelada'
+              ? 'cancelled'
+              : 'updated';
+
       this.n8n.notify(event, updated, {
         triggeredBy: 'admin',
         previousStatus: previous?.status,
       });
+
       return updated;
     } catch (e) {
       this.error.set('No se pudo actualizar la cita.');
@@ -201,93 +351,233 @@ export class AppointmentService {
     }
   }
 
-  async changeStatus(id: number, status: AppointmentStatus): Promise<void> {
+  /**
+   * V25.2:
+   * UPDATE administrativo en Supabase.
+   *
+   * RLS valida que la sesión pertenezca a admin_users.
+   * La respuesta se selecciona porque el administrador sí cuenta
+   * con SELECT autenticado.
+   */
+  private async updateInSupabase(
+    id: number,
+    patch: Partial<AppointmentDraft>,
+  ): Promise<Appointment | null> {
+    const payload: Record<string, unknown> = {};
+
+    if (patch.clientName !== undefined) {
+      payload['client_name'] = patch.clientName;
+    }
+    if (patch.phone !== undefined) {
+      payload['phone'] = patch.phone;
+    }
+    if (patch.email !== undefined) {
+      payload['email'] = patch.email;
+    }
+    if (patch.serviceId !== undefined) {
+      payload['service_id'] = patch.serviceId;
+    }
+    if (patch.barberId !== undefined) {
+      payload['barber_id'] = patch.barberId;
+    }
+    if (patch.date !== undefined) {
+      payload['date'] = patch.date;
+    }
+    if (patch.time !== undefined) {
+      payload['time'] = patch.time;
+    }
+    if (patch.status !== undefined) {
+      payload['status'] = patch.status;
+    }
+    if (patch.notes !== undefined) {
+      payload['notes'] = patch.notes;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return this._appointments().find((a) => a.id === id) ?? null;
+    }
+
+    try {
+      const { data, error } = await this.supabase.client
+        .from('appointments')
+        .update(payload)
+        .eq('id', id)
+        .select(ADMIN_SELECT)
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          this.error.set(
+            'Ese horario ya está ocupado. Elige otro horario.',
+          );
+        } else {
+          this.error.set(
+            'No se pudo actualizar la cita. Verifica tu sesión.',
+          );
+        }
+
+        console.error(
+          'Error actualizando cita en Supabase:',
+          error,
+        );
+        return null;
+      }
+
+      const updated = this.fromSupabaseRow(
+        data as SupabaseAppointmentRow,
+      );
+
+      this._appointments.update((list) =>
+        list.map((a) => (a.id === id ? updated : a)),
+      );
+
+      // V25.4 conectará las notificaciones de producción
+      // desde un entorno seguro. No llamamos al webhook local aquí.
+      return updated;
+    } catch (e) {
+      this.error.set('No se pudo actualizar la cita.');
+      console.error(
+        'Error actualizando cita en Supabase:',
+        e,
+      );
+      return null;
+    }
+  }
+
+  async changeStatus(
+    id: number,
+    status: AppointmentStatus,
+  ): Promise<void> {
     await this.update(id, { status });
   }
 
+  // ─────────────────────────────────────────────────────────
+  // DELETE
+  // ─────────────────────────────────────────────────────────
+
   async remove(id: number): Promise<void> {
+    if (environment.useSupabase) {
+      // En producción V25 se conserva historial:
+      // cancelar ≠ eliminar físicamente.
+      this.error.set(
+        'El borrado permanente está deshabilitado en producción. Cancela la cita en su lugar.',
+      );
+      return;
+    }
+
     try {
-      // Capturamos la cita antes de borrar para poder notificar.
-      const removed = this._appointments().find((a) => a.id === id);
-      await firstValueFrom(this.http.delete(`${API_URL}/${id}`));
-      this._appointments.update((list) => list.filter((a) => a.id !== id));
-      if (removed) this.n8n.notify('deleted', removed, { triggeredBy: 'admin' });
+      const removed = this._appointments().find(
+        (a) => a.id === id,
+      );
+
+      await firstValueFrom(
+        this.http.delete(`${API_URL}/${id}`),
+      );
+
+      this._appointments.update((list) =>
+        list.filter((a) => a.id !== id),
+      );
+
+      if (removed) {
+        this.n8n.notify('deleted', removed, {
+          triggeredBy: 'admin',
+        });
+      }
     } catch (e) {
       this.error.set('No se pudo eliminar la cita.');
       console.error(e);
     }
   }
 
-  // --- Regla de negocio: validación de horario ocupado ---
-  /**
-   * Devuelve true si el barbero ya tiene una cita que se cruza
-   * con el rango [time, time + duración del servicio].
-   * Por ahora se valida solapamiento simple (mismo slot de 30 min)
-   * porque los servicios duran múltiplos de 30.
-   */
-  hasConflict(draft: AppointmentDraft, ignoreId?: number): boolean {
+  // ─────────────────────────────────────────────────────────
+  // AVAILABILITY
+  // ─────────────────────────────────────────────────────────
+
+  hasConflict(
+    draft: AppointmentDraft,
+    ignoreId?: number,
+  ): boolean {
     const start = this.toMinutes(draft.time);
+
     return this._appointments().some((a) => {
       if (a.id === ignoreId) return false;
       if (a.barberId !== draft.barberId) return false;
-      if (a.date    !== draft.date)    return false;
-      if (a.status  === 'cancelada')   return false;
+      if (a.date !== draft.date) return false;
+      if (a.status === 'cancelada') return false;
+
       return this.toMinutes(a.time) === start;
     });
   }
 
-  /**
-   * Devuelve los slots ya ocupados para un barbero+fecha.
-   *
-   * Modo dev (json-server): filtra del signal local `_appointments`.
-   * Modo prod (Supabase): lee del signal `occupiedSlotsByBarberDate`,
-   *   que se llena con `loadOccupiedSlots()` (vía RPC).
-   *
-   * El componente sigue recibiendo `string[]` síncrono.
-   */
-  occupiedSlots(barberId: number, date: string): string[] {
+  occupiedSlots(
+    barberId: number,
+    date: string,
+  ): string[] {
     if (environment.useSupabase) {
       return this.occupiedSlotsByBarberDate();
     }
+
     return this._appointments()
-      .filter((a) => a.barberId === barberId && a.date === date && a.status !== 'cancelada')
+      .filter(
+        (a) =>
+          a.barberId === barberId &&
+          a.date === date &&
+          a.status !== 'cancelada',
+      )
       .map((a) => a.time);
   }
 
-  /**
-   * Carga slots ocupados para un barbero+fecha desde el RPC
-   * `get_occupied_slots` de Supabase. En dev no hace nada.
-   *
-   * Fail-closed con epoch counter: si el usuario cambia barbero/fecha
-   * mientras hay una RPC en vuelo, las respuestas viejas se descartan
-   * y solo la última llamada actualiza el signal.
-   */
-  async loadOccupiedSlots(barberId: number, date: string): Promise<void> {
-    if (!environment.useSupabase) return;
+  async loadOccupiedSlots(
+    barberId: number,
+    date: string,
+  ): Promise<void> {
+    if (!environment.useSupabase) {
+      return;
+    }
+
     const myEpoch = ++this._epoch;
-    // Limpiar slots anteriores inmediatamente (evita parpadeo).
+
     this.occupiedSlotsByBarberDate.set([]);
     this.availabilityLoading.set(true);
     this.availabilityError.set(null);
+
     try {
-      const { data, error } = await this.supabase.client
-        .rpc('get_occupied_slots', {
+      const { data, error } = await this.supabase.client.rpc(
+        'get_occupied_slots',
+        {
           p_barber_id: barberId,
           p_date: date,
-        });
-      // Si llegó una llamada más reciente, descartar esta respuesta.
-      if (myEpoch !== this._epoch) return;
-      if (error) throw error;
-      // Normalizar HH:mm:ss → HH:mm
+        },
+      );
+
+      if (myEpoch !== this._epoch) {
+        return;
+      }
+
+      if (error) {
+        throw error;
+      }
+
       const slots = (data ?? [])
-        .map((row: { time_slot: string }) => row.time_slot)
+        .map(
+          (row: { time_slot: string }) =>
+            row.time_slot,
+        )
         .map((t: string) => t.slice(0, 5));
+
       this.occupiedSlotsByBarberDate.set(slots);
     } catch (e) {
-      if (myEpoch !== this._epoch) return;
-      // Detalles internos solo en consola; UI muestra mensaje genérico.
-      console.error('Error consultando disponibilidad', e);
-      this.availabilityError.set('No se pudo consultar la disponibilidad');
+      if (myEpoch !== this._epoch) {
+        return;
+      }
+
+      console.error(
+        'Error consultando disponibilidad:',
+        e,
+      );
+      this.availabilityError.set(
+        'No se pudo consultar la disponibilidad',
+      );
     } finally {
       if (myEpoch === this._epoch) {
         this.availabilityLoading.set(false);
@@ -295,17 +585,32 @@ export class AppointmentService {
     }
   }
 
-  /**
-   * Limpia el estado de disponibilidad. Usado cuando barbero/fecha
-   * quedan vacíos. También incrementa `_epoch` para invalidar
-   * cualquier RPC pendiente, de modo que una respuesta tardía
-   * no pueda escribir sobre el estado limpio.
-   */
   resetOccupiedSlots(): void {
     this._epoch++;
     this.occupiedSlotsByBarberDate.set([]);
     this.availabilityLoading.set(false);
     this.availabilityError.set(null);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // HELPERS
+  // ─────────────────────────────────────────────────────────
+
+  private fromSupabaseRow(
+    row: SupabaseAppointmentRow,
+  ): Appointment {
+    return {
+      id: row.id,
+      clientName: row.client_name,
+      phone: row.phone,
+      email: row.email,
+      serviceId: row.service_id,
+      barberId: row.barber_id,
+      date: row.date,
+      time: row.time.slice(0, 5),
+      status: row.status,
+      notes: row.notes ?? '',
+    };
   }
 
   private toMinutes(hhmm: string): number {

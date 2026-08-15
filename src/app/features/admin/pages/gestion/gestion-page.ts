@@ -20,21 +20,6 @@ import { ConfirmModal } from '../../../../shared/components/confirm-modal/confir
 
 type Filter = 'todas' | AppointmentStatus;
 
-/**
- * Vista de gestión / panel interno.
- *
- * Esta página es la "puerta trasera" para el personal de la
- * barbería. Se accede vía URL directa (`/gestion`) o por el
- * ícono ⚙ oculto en el footer.
- *
- * Aquí SÍ se permite:
- *   - Eliminar cualquier cita
- *   - Marcar como atendida
- *   - Cancelar citas de otros clientes
- *   - Ver estadísticas globales (gracias a los counts del servicio)
- *
- * En `/citas` (vista cliente) esas acciones están ocultas.
- */
 @Component({
   selector: 'app-gestion-page',
   imports: [RouterLink, AppointmentCard, ConfirmModal],
@@ -43,30 +28,10 @@ type Filter = 'todas' | AppointmentStatus;
 })
 export class GestionPage {
   private apptService = inject(AppointmentService);
-  private router      = inject(Router);
-  protected readonly n8n  = inject(N8nService);
-  protected readonly bot  = inject(ChatbotService);
+  private router = inject(Router);
 
-  constructor() {
-    // Hidratar configuración persistida.
-    this.n8n.restore();
-  }
-
-  protected onN8nModeChange(mode: 'disabled' | 'demo' | 'live'): void {
-    this.n8n.configure({ mode, webhookUrl: this.n8n.webhookUrl() });
-  }
-
-  protected onN8nUrlChange(url: string): void {
-    this.n8n.configure({ mode: this.n8n.mode(), webhookUrl: url });
-  }
-
-  protected onChatModeChange(mode: 'rule-based' | 'ai'): void {
-    this.bot.configure({ mode });
-  }
-
-  protected onAIWebhookChange(url: string): void {
-    this.bot.configure({ webhookUrl: url });
-  }
+  protected readonly n8n = inject(N8nService);
+  protected readonly bot = inject(ChatbotService);
 
   protected readonly filter = signal<Filter>('todas');
   protected readonly search = signal<string>('');
@@ -77,40 +42,113 @@ export class GestionPage {
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly appointments = this.apptService.appointments;
-  protected readonly loading      = this.apptService.loading;
-  protected readonly error        = this.apptService.error;
-  protected readonly counts       = this.apptService.countsByStatus;
-  protected readonly todayCount   = this.apptService.todayCount;
-  protected readonly totalCount   = this.apptService.count;
+  protected readonly loading = this.apptService.loading;
+  protected readonly error = this.apptService.error;
+  protected readonly counts = this.apptService.countsByStatus;
+  protected readonly todayCount = this.apptService.todayCount;
+  protected readonly totalCount = this.apptService.count;
 
-  protected readonly filters: { key: Filter; label: string; count: () => number }[] = [
-    { key: 'todas',      label: 'Todas',       count: () => this.appointments().length },
-    { key: 'pendiente',  label: 'Pendientes',  count: () => this.counts().pendiente  },
-    { key: 'confirmada', label: 'Confirmadas', count: () => this.counts().confirmada },
-    { key: 'atendida',   label: 'Atendidas',   count: () => this.counts().atendida   },
-    { key: 'cancelada',  label: 'Canceladas',  count: () => this.counts().cancelada  },
+  protected readonly filters: {
+    key: Filter;
+    label: string;
+    count: () => number;
+  }[] = [
+    {
+      key: 'todas',
+      label: 'Todas',
+      count: () => this.appointments().length,
+    },
+    {
+      key: 'pendiente',
+      label: 'Pendientes',
+      count: () => this.counts().pendiente,
+    },
+    {
+      key: 'confirmada',
+      label: 'Confirmadas',
+      count: () => this.counts().confirmada,
+    },
+    {
+      key: 'atendida',
+      label: 'Atendidas',
+      count: () => this.counts().atendida,
+    },
+    {
+      key: 'cancelada',
+      label: 'Canceladas',
+      count: () => this.counts().cancelada,
+    },
   ];
 
   protected readonly visible = computed(() => {
     const f = this.filter();
-    const q = this.debouncedSearch().toLowerCase().trim();
+    const q = this.debouncedSearch()
+      .toLowerCase()
+      .trim();
+
     return this.appointments()
       .filter((a) => f === 'todas' || a.status === f)
       .filter((a) => {
-        if (!q) return true;
+        if (!q) {
+          return true;
+        }
+
         return (
           a.clientName.toLowerCase().includes(q) ||
           a.phone.toLowerCase().includes(q) ||
+          a.email.toLowerCase().includes(q) ||
           a.notes.toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+      .sort((a, b) =>
+        (b.date + b.time).localeCompare(a.date + a.time),
+      );
   });
 
-  // ─── Handlers ───
+  protected readonly ALL_STATUSES = APPOINTMENT_STATUSES;
+
+  constructor() {
+    this.n8n.restore();
+
+    // V25.2:
+    // la ruta está detrás de adminGuard; al entrar cargamos
+    // las citas desde json-server (DEV) o Supabase (PROD).
+    void this.apptService.loadAll();
+  }
+
+  protected onN8nModeChange(
+    mode: 'disabled' | 'demo' | 'live',
+  ): void {
+    this.n8n.configure({
+      mode,
+      webhookUrl: this.n8n.webhookUrl(),
+    });
+  }
+
+  protected onN8nUrlChange(url: string): void {
+    this.n8n.configure({
+      mode: this.n8n.mode(),
+      webhookUrl: url,
+    });
+  }
+
+  protected onChatModeChange(
+    mode: 'rule-based' | 'ai',
+  ): void {
+    this.bot.configure({ mode });
+  }
+
+  protected onAIWebhookChange(url: string): void {
+    this.bot.configure({ webhookUrl: url });
+  }
+
   protected onSearchInput(value: string): void {
     this.search.set(value);
-    if (this.debounceHandle) clearTimeout(this.debounceHandle);
+
+    if (this.debounceHandle) {
+      clearTimeout(this.debounceHandle);
+    }
+
     this.debounceHandle = setTimeout(() => {
       this.debouncedSearch.set(value);
     }, 250);
@@ -121,7 +159,10 @@ export class GestionPage {
   }
 
   protected onEdit(appt: Appointment): void {
-    this.router.navigate(['/citas/editar', appt.id]);
+    void this.router.navigate([
+      '/citas/editar',
+      appt.id,
+    ]);
   }
 
   protected onDelete(id: number): void {
@@ -131,8 +172,13 @@ export class GestionPage {
 
   protected async onConfirmDelete(): Promise<void> {
     const id = this.pendingDeleteId();
-    if (id == null) return;
+
+    if (id == null) {
+      return;
+    }
+
     await this.apptService.remove(id);
+
     this.showDeleteModal.set(false);
     this.pendingDeleteId.set(null);
   }
@@ -143,18 +189,33 @@ export class GestionPage {
   }
 
   protected async onConfirm(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'confirmada');
+    await this.apptService.changeStatus(
+      id,
+      'confirmada',
+    );
   }
+
   protected async onAttend(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'atendida');
+    await this.apptService.changeStatus(
+      id,
+      'atendida',
+    );
   }
+
   protected async onCancel(id: number): Promise<void> {
-    await this.apptService.changeStatus(id, 'cancelada');
+    await this.apptService.changeStatus(
+      id,
+      'cancelada',
+    );
   }
 
   protected statusLabel(s: Filter): string {
-    return s === 'todas' ? 'Todas' : STATUS_LABELS[s as AppointmentStatus];
+    return s === 'todas'
+      ? 'Todas'
+      : STATUS_LABELS[s as AppointmentStatus];
   }
 
-  protected readonly ALL_STATUSES = APPOINTMENT_STATUSES;
+  protected reload(): void {
+    void this.apptService.loadAll();
+  }
 }

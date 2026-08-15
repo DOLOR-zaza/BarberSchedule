@@ -1,20 +1,16 @@
 <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <!-- Banner informativo: vista de solo lectura -->
-  <div class="glass rounded-2xl p-4 mb-6 ring-1 ring-white/5 flex items-start gap-3">
-    <span class="text-2xl mt-0.5">👁️</span>
+  <!-- V25: esta ruta está protegida por adminGuard -->
+  <div class="glass rounded-2xl p-4 mb-6 ring-1 ring-emerald-500/15 flex items-start gap-3">
+    <span class="text-2xl mt-0.5">🔐</span>
     <div class="flex-1 text-sm">
       <p class="text-ink-200">
-        <strong class="text-ink-100">Vista pública</strong> — aquí puedes consultar
-        el estado de las citas. Para modificar una cita, contacta a la barbería
-        o usa el
-        <a routerLink="/asistente" class="text-brand-300 hover:text-brand-200 underline underline-offset-2">
-          asistente virtual
-        </a>.
+        <strong class="text-ink-100">Vista administrativa</strong>
+        — las citas y datos de contacto solo son visibles para una
+        cuenta autorizada.
       </p>
     </div>
   </div>
 
-  <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
     <div>
       <h1 class="text-5xl font-display font-bold">Citas</h1>
@@ -22,29 +18,38 @@
         {{ visible().length }} de {{ appointments().length }} citas mostradas
       </p>
     </div>
-    <a
-      routerLink="/nueva-cita"
-      class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold transition-all shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 self-start sm:self-auto"
-    >
-      <span class="text-xl">＋</span> Nueva cita
-    </a>
+
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        (click)="reload()"
+        [disabled]="loading()"
+        class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 hover:bg-white/10 text-ink-200 font-medium transition-all ring-1 ring-white/10 disabled:opacity-50"
+      >
+        ↻ Actualizar
+      </button>
+
+      <a
+        routerLink="/nueva-cita"
+        class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-ink-950 font-semibold transition-all shadow-lg shadow-brand-500/30 hover:-translate-y-0.5"
+      >
+        <span class="text-xl">＋</span> Nueva cita
+      </a>
+    </div>
   </div>
 
-  <!-- Toolbar: search + filter chips -->
   <div class="glass rounded-2xl p-4 mb-6 space-y-4">
-    <!-- Search -->
     <div class="relative">
       <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500">🔍</span>
       <input
         type="search"
         [value]="search()"
         (input)="onSearchInput($any($event.target).value)"
-        placeholder="Buscar por nombre o teléfono…"
+        placeholder="Buscar por nombre, teléfono o correo…"
         class="w-full pl-11 pr-4 py-3 rounded-xl bg-ink-900/60 border border-white/5 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none text-ink-100 placeholder-ink-500 transition-all"
       />
     </div>
 
-    <!-- Filter chips -->
     <div class="flex flex-wrap gap-2">
       @for (f of filters; track f.key) {
         <button
@@ -67,7 +72,12 @@
     </div>
   </div>
 
-  <!-- Loading state -->
+  @if (error()) {
+    <div class="glass rounded-2xl p-5 mb-6 ring-1 ring-rose-500/30 bg-rose-500/5">
+      <p class="text-rose-300 text-sm">⚠️ {{ error() }}</p>
+    </div>
+  }
+
   @if (loading()) {
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       @for (i of [1,2,3,4,5,6]; track i) {
@@ -80,7 +90,6 @@
     </div>
   }
 
-  <!-- Empty state -->
   @if (!loading() && visible().length === 0) {
     <div class="glass rounded-2xl p-16 text-center">
       <div class="text-7xl mb-4">📭</div>
@@ -91,19 +100,12 @@
         } @else if (filter() !== 'todas') {
           No hay citas con estado "{{ statusLabel(filter()) }}".
         } @else {
-          Aún no has agendado ninguna cita.
+          Aún no se han registrado citas.
         }
       </p>
-      <a
-        routerLink="/nueva-cita"
-        class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-500 text-ink-950 font-semibold"
-      >
-        ＋ Agendar la primera
-      </a>
     </div>
   }
 
-  <!-- List -->
   @if (!loading() && visible().length > 0) {
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       @for (appt of visible(); track appt.id) {
@@ -115,4 +117,3 @@
     </div>
   }
 </section>
-

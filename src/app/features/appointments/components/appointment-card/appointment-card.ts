@@ -1,16 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { Appointment, AppointmentStatus } from '../../../../core/models';
-import { BarberService, ServiceCatalogService } from '../../../../core/services';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+} from '@angular/core';
+import {
+  Appointment,
+  AppointmentStatus,
+} from '../../../../core/models';
+import {
+  BarberService,
+  ServiceCatalogService,
+} from '../../../../core/services';
 import { StatusBadge } from '../../../../shared/components/status-badge/status-badge';
 import { TiltOnHoverDirective } from '../../../../shared/directives/tilt-on-hover.directive';
+import { environment } from '../../../../../environments/environment';
 
-/**
- * Tarjeta de cita con @Input() y @Output() para cumplir el
- * requisito de rúbrica: "componentes haciendo uso de I/O".
- *
- * El padre (lista) manda la cita y recibe los eventos.
- * El componente NO muta datos: solo emite intenciones.
- */
 @Component({
   selector: 'app-appointment-card',
   imports: [StatusBadge, TiltOnHoverDirective],
@@ -18,102 +25,142 @@ import { TiltOnHoverDirective } from '../../../../shared/directives/tilt-on-hove
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppointmentCard {
-  // --- Inputs ---
-  /** Cita a renderizar. Requerida. */
   readonly appointment = input.required<Appointment>();
-
-  /** Modo compacto para listas densas. Default: false */
   readonly compact = input<boolean>(false);
 
-  /**
-   * Modo de la tarjeta.
-   * - 'client': solo lectura, sin botones de acción.
-   *   Para vista pública donde cualquiera puede ver citas ajenas.
-   * - 'admin': todos los botones disponibles.
-   *   Para vista de gestión / personal de la barbería.
-   *
-   * Default: 'admin' (compatibilidad con código existente).
-   */
   readonly mode = input<'client' | 'admin'>('admin');
 
-  /** @deprecated usar `mode="admin"` en su lugar. */
+  /**
+   * En DEV se conserva el borrado permanente existente.
+   * En PROD V25 se oculta: las citas se cancelan y se conserva historial.
+   */
   readonly showDelete = input<boolean>(true);
 
-  // --- Outputs (eventos que el padre escucha) ---
-  /** Emite la cita completa cuando el usuario pide editarla. */
-  readonly edit    = output<Appointment>();
-  /** Emite el id cuando se solicita eliminar. */
-  readonly delete  = output<number>();
-  /** Emite el id cuando se confirma una cita pendiente. */
+  readonly edit = output<Appointment>();
+  readonly delete = output<number>();
   readonly confirm = output<number>();
-  /** Emite el id cuando se marca como atendida. */
-  readonly attend  = output<number>();
-  /** Emite el id cuando se cancela una cita. */
-  readonly cancel  = output<number>();
+  readonly attend = output<number>();
+  readonly cancel = output<number>();
 
-  // --- Inyecciones para enriquecer la vista ---
   private catalog = inject(ServiceCatalogService);
   private barbers = inject(BarberService);
 
-  // --- Selectores derivados ---
   protected readonly service = computed(() =>
-    this.catalog.getById(this.appointment().serviceId),
+    this.catalog.getById(
+      this.appointment().serviceId,
+    ),
   );
+
   protected readonly barber = computed(() =>
-    this.barbers.getById(this.appointment().barberId),
+    this.barbers.getById(
+      this.appointment().barberId,
+    ),
   );
 
-  /**
-   * Acciones disponibles según el estado actual.
-   * Mantiene la UI declarativa: el padre solo escucha eventos.
-   *
-   * En modo 'client' no se muestra ningún botón — solo lectura.
-   * El cliente ve el estado de la cita pero no puede modificarla.
-   */
   protected readonly actions = computed<readonly ActionDef[]>(() => {
-    const status: AppointmentStatus = this.appointment().status;
-    const isClient = this.mode() === 'client';
+    const status: AppointmentStatus =
+      this.appointment().status;
 
-    // En modo cliente: tarjeta puramente informativa, sin botones.
-    if (isClient) return [];
+    if (this.mode() === 'client') {
+      return [];
+    }
 
-    const showDelete = this.showDelete();
-    const delBtn: ActionDef = { key: 'delete', label: 'Eliminar', icon: '🗑', variant: 'ghost' };
+    const allowDelete =
+      this.showDelete() &&
+      !environment.useSupabase;
 
-    const map: Record<AppointmentStatus, ActionDef[]> = {
+    const deleteButton: ActionDef = {
+      key: 'delete',
+      label: 'Eliminar',
+      icon: '🗑',
+      variant: 'ghost',
+    };
+
+    const map: Record<
+      AppointmentStatus,
+      ActionDef[]
+    > = {
       pendiente: [
-        { key: 'confirm', label: 'Confirmar',   icon: '✓', variant: 'primary' },
-        { key: 'edit',    label: 'Editar',      icon: '✎', variant: 'ghost'   },
-        { key: 'cancel',  label: 'Cancelar',    icon: '✕', variant: 'danger'  },
-        ...(showDelete ? [delBtn] : []),
+        {
+          key: 'confirm',
+          label: 'Confirmar',
+          icon: '✓',
+          variant: 'primary',
+        },
+        {
+          key: 'edit',
+          label: 'Editar',
+          icon: '✎',
+          variant: 'ghost',
+        },
+        {
+          key: 'cancel',
+          label: 'Cancelar',
+          icon: '✕',
+          variant: 'danger',
+        },
+        ...(allowDelete ? [deleteButton] : []),
       ],
       confirmada: [
-        { key: 'attend', label: 'Marcar atendida', icon: '✦', variant: 'primary' },
-        { key: 'edit',   label: 'Editar',          icon: '✎', variant: 'ghost'   },
-        { key: 'cancel', label: 'Cancelar',        icon: '✕', variant: 'danger'  },
-        ...(showDelete ? [delBtn] : []),
+        {
+          key: 'attend',
+          label: 'Marcar atendida',
+          icon: '✦',
+          variant: 'primary',
+        },
+        {
+          key: 'edit',
+          label: 'Editar',
+          icon: '✎',
+          variant: 'ghost',
+        },
+        {
+          key: 'cancel',
+          label: 'Cancelar',
+          icon: '✕',
+          variant: 'danger',
+        },
+        ...(allowDelete ? [deleteButton] : []),
       ],
-      atendida:   showDelete ? [delBtn] : [],
-      cancelada:  showDelete ? [delBtn] : [],
+      atendida: allowDelete
+        ? [deleteButton]
+        : [],
+      cancelada: allowDelete
+        ? [deleteButton]
+        : [],
     };
+
     return map[status] ?? [];
   });
 
-  /** Dispatcher: enruta el click al Output correspondiente. */
-  protected onAction(key: ActionDef['key']): void {
+  protected onAction(
+    key: ActionDef['key'],
+  ): void {
     const id = this.appointment().id;
-    const a  = this.appointment();
+    const appointment = this.appointment();
+
     switch (key) {
-      case 'edit':    this.edit.emit(a);    break;
-      case 'delete':  this.delete.emit(id); break;
-      case 'confirm': this.confirm.emit(id); break;
-      case 'attend':  this.attend.emit(id);  break;
-      case 'cancel':  this.cancel.emit(id);  break;
+      case 'edit':
+        this.edit.emit(appointment);
+        break;
+      case 'delete':
+        this.delete.emit(id);
+        break;
+      case 'confirm':
+        this.confirm.emit(id);
+        break;
+      case 'attend':
+        this.attend.emit(id);
+        break;
+      case 'cancel':
+        this.cancel.emit(id);
+        break;
     }
   }
 
-  /** Clases de Tailwind según la variante de la acción. */
-  protected actionClass(variant: ActionDef['variant']): string {
+  protected actionClass(
+    variant: ActionDef['variant'],
+  ): string {
     switch (variant) {
       case 'primary':
         return 'bg-brand-500 hover:bg-brand-400 text-ink-950 shadow-sm shadow-brand-500/30';
@@ -127,7 +174,12 @@ export class AppointmentCard {
 }
 
 type ActionDef = {
-  key: 'edit' | 'delete' | 'confirm' | 'attend' | 'cancel';
+  key:
+    | 'edit'
+    | 'delete'
+    | 'confirm'
+    | 'attend'
+    | 'cancel';
   label: string;
   icon: string;
   variant: 'primary' | 'danger' | 'ghost';
