@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1786762916979,
+  "timestamp": 1786767510136,
   "index": "/BarberSchedule/index.html",
   "assetGroups": [
     {
@@ -14,7 +14,6 @@
         "/BarberSchedule/chunk-2B43JZKS.js",
         "/BarberSchedule/chunk-5XTWHDJK.js",
         "/BarberSchedule/chunk-7G5YU6GZ.js",
-        "/BarberSchedule/chunk-BD73767V.js",
         "/BarberSchedule/chunk-BXQLZ3AC.js",
         "/BarberSchedule/chunk-C5Q24S5K.js",
         "/BarberSchedule/chunk-EJNDEZ7G.js",
@@ -25,6 +24,7 @@
         "/BarberSchedule/chunk-JM3E4RVT.js",
         "/BarberSchedule/chunk-L6XPMHKJ.js",
         "/BarberSchedule/chunk-NBQIMCQN.js",
+        "/BarberSchedule/chunk-OC7GOHFD.js",
         "/BarberSchedule/chunk-QSJJRLDA.js",
         "/BarberSchedule/chunk-QTOBXOUV.js",
         "/BarberSchedule/chunk-R2VGZTCZ.js",
@@ -33,7 +33,7 @@
         "/BarberSchedule/chunk-Z2IL23CO.js",
         "/BarberSchedule/favicon.ico",
         "/BarberSchedule/index.html",
-        "/BarberSchedule/main-K37XZCQA.js",
+        "/BarberSchedule/main-YVQFGFJZ.js",
         "/BarberSchedule/manifest.webmanifest",
         "/BarberSchedule/styles-E63M6OUH.css"
       ],
@@ -85,7 +85,6 @@
     "/BarberSchedule/chunk-2B43JZKS.js": "cf6e0216cf9efafcd5f7ad06a2b836cc4bb50eef",
     "/BarberSchedule/chunk-5XTWHDJK.js": "4852cdf83e8499f3c9aad94577ea8ef3ede68529",
     "/BarberSchedule/chunk-7G5YU6GZ.js": "0be9de1f83869f10002974e13a287b48c781b891",
-    "/BarberSchedule/chunk-BD73767V.js": "11f5032e408141fd21ec349f9d6757384aaebf94",
     "/BarberSchedule/chunk-BXQLZ3AC.js": "a06b066e9010876024dcb24aeb42df31ccd27595",
     "/BarberSchedule/chunk-C5Q24S5K.js": "db62c623df1b432e033884faaabe660abbc82e17",
     "/BarberSchedule/chunk-EJNDEZ7G.js": "7aaafb985115c80eee783652bcd0fe8743ed4937",
@@ -96,6 +95,7 @@
     "/BarberSchedule/chunk-JM3E4RVT.js": "5a670a701b39c1f2413b9cb57f2f8d0ab056d296",
     "/BarberSchedule/chunk-L6XPMHKJ.js": "95dcf0f930d5d928e1cf33d94c52bdee7e53094e",
     "/BarberSchedule/chunk-NBQIMCQN.js": "8cb0f9253fa2fdf681a920ddfb6dc8d045abcc00",
+    "/BarberSchedule/chunk-OC7GOHFD.js": "700b3fea258c244bbae7d9ecb6d857077dcd2d5b",
     "/BarberSchedule/chunk-QSJJRLDA.js": "e9f2c5d543cf288b00650446fcb0e57eabfb6a7d",
     "/BarberSchedule/chunk-QTOBXOUV.js": "aee6513791483c509dcaa526892f9aecea316fb0",
     "/BarberSchedule/chunk-R2VGZTCZ.js": "4f8481b7914311217be8f43d43172e48d65088ba",
@@ -103,8 +103,8 @@
     "/BarberSchedule/chunk-YECBDL6L.js": "b88626dc838ba6d8d5faffaa6c243f911484ad35",
     "/BarberSchedule/chunk-Z2IL23CO.js": "51485d90bef88a65962b0165ceea268fd0dc112a",
     "/BarberSchedule/favicon.ico": "9c39f434fe1261f68c5e3eefdf734630d99c5670",
-    "/BarberSchedule/index.html": "06f93a24266491498dac721aa9f76c4689a4d2a3",
-    "/BarberSchedule/main-K37XZCQA.js": "b774439ccfe5d3f06565587ce0ed4bb67c870b9f",
+    "/BarberSchedule/index.html": "0c621ed04bf952ed1372c72eb2663d7d579d5bf5",
+    "/BarberSchedule/main-YVQFGFJZ.js": "05658e40fe67f703de37451d6ace9d67e9cfce89",
     "/BarberSchedule/manifest.webmanifest": "988ecbb59e080c0cdb69814978acff0dece206ea",
     "/BarberSchedule/styles-E63M6OUH.css": "52761c504e00994de5ffe32441ba0f7cea8ba985"
   },
