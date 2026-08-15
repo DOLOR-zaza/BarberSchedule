@@ -1,0 +1,209 @@
+<main class="auth-shell">
+  <a class="brand" routerLink="/inicio" aria-label="Volver al inicio de BarberSchedule">
+    <span class="brand-pole" aria-hidden="true">💈</span>
+    <span>
+      <strong>Barber</strong>
+      <strong>Schedule</strong>
+    </span>
+  </a>
+
+  <section class="auth-card" aria-labelledby="auth-title">
+    @if (signedInAdmin()) {
+      <div class="status-icon success" aria-hidden="true">✓</div>
+      <p class="eyebrow">V25 · ADMIN</p>
+      <h1 id="auth-title">Sesión administrativa activa</h1>
+      <p class="lead">
+        Iniciaste sesión correctamente como administrador de BarberSchedule.
+      </p>
+
+      <div class="account">
+        <span>Cuenta</span>
+        <strong>{{ auth.email() }}</strong>
+      </div>
+
+      @if (notice()) {
+        <p class="notice success-notice">{{ notice() }}</p>
+      }
+
+      @if (auth.error()) {
+        <p class="notice error-notice">{{ auth.error() }}</p>
+      }
+
+      <div class="actions stacked">
+        <button class="primary" type="button" (click)="goHome()">
+          Continuar al inicio
+        </button>
+        <button
+          class="secondary"
+          type="button"
+          [disabled]="auth.loading()"
+          (click)="logout()"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    } @else if (mode() === 'password') {
+      <p class="eyebrow">SEGURIDAD</p>
+      <h1 id="auth-title">Establece tu contraseña</h1>
+      <p class="lead">
+        Crea una contraseña de al menos 8 caracteres para tu cuenta administrativa.
+      </p>
+
+      <form class="form" [formGroup]="passwordForm" (ngSubmit)="submitPassword()">
+        <label>
+          <span>Nueva contraseña</span>
+          <div class="password-field">
+            <input
+              [type]="passwordVisible() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="new-password"
+              placeholder="Mínimo 8 caracteres"
+            />
+            <button type="button" class="reveal" (click)="togglePassword()">
+              {{ passwordVisible() ? 'Ocultar' : 'Ver' }}
+            </button>
+          </div>
+        </label>
+
+        <label>
+          <span>Confirmar contraseña</span>
+          <div class="password-field">
+            <input
+              [type]="confirmPasswordVisible() ? 'text' : 'password'"
+              formControlName="confirmPassword"
+              autocomplete="new-password"
+              placeholder="Repite la contraseña"
+            />
+            <button type="button" class="reveal" (click)="toggleConfirmPassword()">
+              {{ confirmPasswordVisible() ? 'Ocultar' : 'Ver' }}
+            </button>
+          </div>
+        </label>
+
+        @if (auth.error()) {
+          <p class="notice error-notice">{{ auth.error() }}</p>
+        }
+
+        @if (notice()) {
+          <p class="notice success-notice">{{ notice() }}</p>
+        }
+
+        <button class="primary" type="submit" [disabled]="auth.loading()">
+          {{ auth.loading() ? 'Guardando…' : 'Guardar contraseña' }}
+        </button>
+      </form>
+
+      <button class="text-button" type="button" (click)="showLogin()">
+        Volver al acceso
+      </button>
+    } @else if (mode() === 'forgot') {
+      <p class="eyebrow">RECUPERACIÓN</p>
+      <h1 id="auth-title">Crear o recuperar contraseña</h1>
+      <p class="lead">
+        Escribe el correo de tu cuenta administrativa y te enviaremos un enlace seguro.
+      </p>
+
+      <form class="form" [formGroup]="resetForm" (ngSubmit)="submitReset()">
+        <label>
+          <span>Correo</span>
+          <input
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            placeholder="admin@ejemplo.com"
+          />
+        </label>
+
+        @if (
+          resetForm.controls.email.touched &&
+          resetForm.controls.email.invalid
+        ) {
+          <p class="field-error">Escribe un correo válido.</p>
+        }
+
+        @if (auth.error()) {
+          <p class="notice error-notice">{{ auth.error() }}</p>
+        }
+
+        @if (notice()) {
+          <p class="notice success-notice">{{ notice() }}</p>
+        }
+
+        <button class="primary" type="submit" [disabled]="auth.loading()">
+          {{ auth.loading() ? 'Enviando…' : 'Enviar enlace' }}
+        </button>
+      </form>
+
+      <button class="text-button" type="button" (click)="showLogin()">
+        Volver al acceso
+      </button>
+    } @else {
+      <p class="eyebrow">ACCESO ADMINISTRADOR</p>
+      <h1 id="auth-title">Bienvenido de nuevo</h1>
+      <p class="lead">
+        Inicia sesión para acceder a las herramientas administrativas de BarberSchedule.
+      </p>
+
+      <form class="form" [formGroup]="loginForm" (ngSubmit)="submitLogin()">
+        <label>
+          <span>Correo</span>
+          <input
+            type="email"
+            formControlName="email"
+            autocomplete="username"
+            placeholder="admin@ejemplo.com"
+          />
+        </label>
+
+        @if (
+          loginForm.controls.email.touched &&
+          loginForm.controls.email.invalid
+        ) {
+          <p class="field-error">Escribe un correo válido.</p>
+        }
+
+        <label>
+          <span>Contraseña</span>
+          <div class="password-field">
+            <input
+              [type]="passwordVisible() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+              placeholder="Tu contraseña"
+            />
+            <button type="button" class="reveal" (click)="togglePassword()">
+              {{ passwordVisible() ? 'Ocultar' : 'Ver' }}
+            </button>
+          </div>
+        </label>
+
+        @if (
+          loginForm.controls.password.touched &&
+          loginForm.controls.password.invalid
+        ) {
+          <p class="field-error">Escribe tu contraseña.</p>
+        }
+
+        @if (auth.error()) {
+          <p class="notice error-notice">{{ auth.error() }}</p>
+        }
+
+        @if (notice()) {
+          <p class="notice success-notice">{{ notice() }}</p>
+        }
+
+        <button class="primary" type="submit" [disabled]="auth.loading()">
+          {{ auth.loading() ? 'Verificando…' : 'Iniciar sesión' }}
+        </button>
+      </form>
+
+      <button class="text-button" type="button" (click)="showForgot()">
+        ¿Primera vez o no tienes contraseña?
+      </button>
+    }
+  </section>
+
+  <p class="security-note">
+    🔒 El acceso administrativo se valida con Supabase Auth y permisos RLS.
+  </p>
+</main>

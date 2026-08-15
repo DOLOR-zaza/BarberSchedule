@@ -1,22 +1,14 @@
-import { inject } from '@angular/core';
-import { CanMatchFn, Router, Routes } from '@angular/router';
-import { environment } from '../environments/environment';
-
-/**
- * V24 pública:
- * las pantallas que requieren leer/modificar appointments permanecen
- * disponibles en desarrollo, pero quedan cerradas en producción
- * hasta implementar Supabase Auth en V25.
- */
-const localOnlyGuard: CanMatchFn = () => {
-  if (!environment.useSupabase) {
-    return true;
-  }
-
-  return inject(Router).createUrlTree(['/inicio']);
-};
+import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
+  {
+    path: 'login',
+    title: 'Acceso administrador · BarberSchedule',
+    loadComponent: () =>
+      import('./features/auth/pages/login/login-page')
+        .then((m) => m.LoginPage),
+  },
   {
     path: '',
     loadComponent: () =>
@@ -36,7 +28,7 @@ export const routes: Routes = [
       {
         path: 'citas',
         title: 'Citas · BarberSchedule',
-        canMatch: [localOnlyGuard],
+        canMatch: [adminGuard],
         loadComponent: () =>
           import('./features/appointments/pages/appointment-list/appointment-list-page')
             .then((m) => m.AppointmentListPage),
@@ -51,7 +43,7 @@ export const routes: Routes = [
       {
         path: 'citas/editar/:id',
         title: 'Editar cita · BarberSchedule',
-        canMatch: [localOnlyGuard],
+        canMatch: [adminGuard],
         loadComponent: () =>
           import('./features/appointments/pages/appointment-form/appointment-form-page')
             .then((m) => m.AppointmentFormPage),
@@ -86,7 +78,7 @@ export const routes: Routes = [
       {
         path: 'gestion',
         title: 'Gestión · BarberSchedule',
-        canMatch: [localOnlyGuard],
+        canMatch: [adminGuard],
         loadComponent: () =>
           import('./features/admin/pages/gestion/gestion-page')
             .then((m) => m.GestionPage),

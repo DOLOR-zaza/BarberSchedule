@@ -20,7 +20,7 @@
 
     <!-- Desktop nav -->
     <ul class="hidden md:flex items-center gap-1">
-      @for (item of navItems; track item.path) {
+      @for (item of navItems(); track item.path) {
         <li>
           <a
             [routerLink]="item.path"
@@ -58,7 +58,7 @@
   @if (mobileOpen()) {
     <div class="md:hidden border-t border-white/5 bg-ink-950/95 backdrop-blur-lg" role="navigation" aria-label="Menú móvil">
       <ul class="px-4 py-3 space-y-1">
-        @for (item of navItems; track item.path) {
+        @for (item of navItems(); track item.path) {
           <li>
             <a
               [routerLink]="item.path"
@@ -97,18 +97,19 @@
       <span class="text-brand-400">💈 BarberSchedule</span> ·
       Hecho con Angular 21 + Tailwind v4 · {{ 2026 }}
     </p>
-    <!-- Entrada oculta al panel de gestión (admin/staff).
-         Está en el footer para no ser obvia al cliente casual. -->
-    @if (showLocalOnly) {
-  <a
-    routerLink="/gestion"
-    aria-label="Acceso interno"
-    title="Acceso interno"
-    class="opacity-30 hover:opacity-100 transition-opacity text-base px-2"
-  >
-    ⚙
-  </a>
-}
+
+    <!--
+      En producción:
+      - cliente/no autenticado -> /login
+      - administrador -> /gestion
+      En desarrollo conserva acceso al panel local.
+    -->
+    <a
+      [routerLink]="internalAccessPath()"
+      [attr.aria-label]="internalAccessTitle()"
+      [attr.title]="internalAccessTitle()"
+      class="opacity-30 hover:opacity-100 transition-opacity text-base px-2"
+    >⚙</a>
   </div>
 </footer>
 
