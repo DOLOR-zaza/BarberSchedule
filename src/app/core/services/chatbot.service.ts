@@ -472,9 +472,7 @@ const action = restrictedAction ? null : response.action;
         undefined,
         'rule-based',
       );
-      // Cambiar a modo rule-based para el resto de la conversación
-      this.mode.set('rule-based');
-      this.saveMode();
+
     } finally {
       this.isTyping.set(false);
     }
